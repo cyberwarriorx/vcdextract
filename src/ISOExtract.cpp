@@ -94,8 +94,13 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 				if (!readSectorSubheader(offset, &subheader))
 					return FALSE;
 
-            if (subheader.sm & XAFLAG_FORM2)        
-               size = 2324;
+            if (subheader.sm & XAFLAG_FORM2)
+				{
+					if (subheader.sm & XAFLAG_AUDIO)
+						size = 2304; // We don't need the last 20 bytes
+					else
+                  size = 2324;
+				}
             else
                size = 2048;
 
@@ -652,36 +657,55 @@ int ISOExtractClass::createDB(cdinfo_struct *cdinfo, pvd_struct *pvd, dirrec_str
 
 	db->addFile(dirrec, 0, this);
 
-   for (i = 1; i < numdirrec; i++)
-   {
-      next_lba = 0xFFFFFFFF;
-		next_index = 0xFFFFFFFF;
-      for (j = 1; j < numdirrec; j++)
-      {
-         if (dirrec[j].LocationOfExtentL > last_lba &&
-             dirrec[j].LocationOfExtentL < next_lba )
-         {
-            next_index = j;
-            next_lba = dirrec[j].LocationOfExtentL;
-         }
-      }
+	if (sortType == SORT_BY_LBA)
+	{
+		for (i = 1; i < numdirrec; i++)
+		{
+			next_lba = 0xFFFFFFFF;
+			next_index = 0xFFFFFFFF;
+			for (j = 1; j < numdirrec; j++)
+			{
+				if (dirrec[j].LocationOfExtentL > last_lba &&
+					dirrec[j].LocationOfExtentL < next_lba )
+				{
+					next_index = j;
+					next_lba = dirrec[j].LocationOfExtentL;
+				}
+			}
 
 
-      if (next_index == 0xFFFFFFFF || 
- 		    dirrec[next_index].FileIdentifier[0] == 0 ||
-          dirrec[next_index].FileIdentifier[0] == 1)
-      {
-      }
-      else
-      {
-         db->addFile(dirrec, next_index, this);
-         k++;
-      }
+			if (next_index == 0xFFFFFFFF || 
+				dirrec[next_index].FileIdentifier[0] == 0 ||
+				dirrec[next_index].FileIdentifier[0] == 1)
+			{
+			}
+			else
+			{
+				db->addFile(dirrec, next_index, this);
+				k++;
+			}
 
-      last_lba = next_lba;
-   }
-
-   db->setFileNumber(k);
+			last_lba = next_lba;
+		}
+	}
+	else if (sortType == SORT_BY_DIRREC)
+	{
+		for (i = 1; i < numdirrec; i++)
+		{
+			next_index = i;
+			if (next_index == 0xFFFFFFFF || 
+				dirrec[next_index].FileIdentifier[0] == 0 ||
+				dirrec[next_index].FileIdentifier[0] == 1)
+			{
+			}
+			else
+			{
+				db->addFile(dirrec, next_index, this);
+				k++;
+			}
+		}
+	}
+	db->setFileNumber(k);
 
    for (int i = 0; i < cdinfo->numtracks; i++)
       db->addTrack(&cdinfo->trackinfo[i], i);
@@ -935,4 +959,9 @@ error:
    if (imageFp)
      fclose(imageFp);
    return FALSE;
+}
+
+void ISOExtractClass::setSortType(ISOExtractClass::SORTTYPE sortType)
+{
+	this->sortType = sortType;
 }

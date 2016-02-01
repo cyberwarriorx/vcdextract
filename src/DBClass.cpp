@@ -245,7 +245,7 @@ void DBClass::writeDate(FILE *fp, char *string, unsigned char *value, size_t val
 	char *ptr=stripEndWhiteSpace(value, value_size);
 	sscanf(ptr, "%04d%02d%02d%02d%02d%02d%02d", &year, &month, &day, &hour, &min, &second, &ms);
 	if (year && month && day)
-	   fprintf(fp, "    %-27s %02d/%02d/%04d %02d:%02d:%02d:%02d:%02d\n", string, day, month, year, hour, min, second, ms, gmt);
+	   fprintf(fp, "                    %-27s %02d/%02d/%04d %02d:%02d:%02d:%02d:%02d\n", string, day, month, year, hour, min, second, ms, gmt);
 }
 
 bool DBClass::saveSCR(const char *filename, bool oldTime)
@@ -262,32 +262,32 @@ bool DBClass::saveSCR(const char *filename, bool oldTime)
    switch (sessionType)
    {
       case ST_CDROM:
-         fprintf(fp, "Session CDROM\n");
+         fprintf(fp, "    Session CDROM\n");
          break;
       case ST_CDI:
-         fprintf(fp, "Session CDI\n");
+         fprintf(fp, "    Session CDI\n");
          break;
       case ST_ROMXA:
-         fprintf(fp, "Session ROMXA\n");
+         fprintf(fp, "    Session ROMXA\n");
          break;
       case ST_SEMIXA:
-         fprintf(fp, "Session SEMIXA\n");
+         fprintf(fp, "    Session SEMIXA\n");
          break;
       default: break;
    }
-   fprintf(fp, "LeadIn MODE1\nEndLeadIn\n");
-   fprintf(fp, "SystemArea \"IP.BIN\"\n");
-   fprintf(fp, "Track MODE1\n");
-   fprintf(fp, "Volume ISO9660 \"%s.PVD\"\n", stripEndWhiteSpace(pvd.VolumeIdentifier, sizeof(pvd.VolumeIdentifier)));
-   fprintf(fp, "    PrimaryVolume 0:2:16\n");
-   fprintf(fp, "    SystemIdentifier            \"SEGA SEGASATURN\"\n");
-   fprintf(fp, "    VolumeIdentifier            \"%s\"\n", stripEndWhiteSpace(pvd.VolumeIdentifier, sizeof(pvd.VolumeIdentifier)));
-   fprintf(fp, "    VolumeSetIdentifier         \"%s\"\n", stripEndWhiteSpace(pvd.VolumeSetIdentifier, sizeof(pvd.VolumeSetIdentifier)));
-   fprintf(fp, "    PublisherIdentifier         \"%s\"\n", stripEndWhiteSpace(pvd.PublisherIdentifier, sizeof(pvd.PublisherIdentifier)));
-   fprintf(fp, "    DataPreparerIdentifier      \"%s\"\n", stripEndWhiteSpace(pvd.DataPreparerIdentifier, sizeof(pvd.DataPreparerIdentifier)));
-   fprintf(fp, "    CopyrightFileIdentifier     \"%s\"\n", stripEndWhiteSpace(pvd.CopyrightFileIdentifier, sizeof(pvd.CopyrightFileIdentifier)));
-   fprintf(fp, "    AbstractFileIdentifier      \"%s\"\n", stripEndWhiteSpace(pvd.AbstractFileIdentifier, sizeof(pvd.AbstractFileIdentifier)));
-   fprintf(fp, "    BibliographicFileIdentifier \"%s\"\n", stripEndWhiteSpace(pvd.BibliographicFileIdentifier, sizeof(pvd.BibliographicFileIdentifier)));
+   fprintf(fp, "        LeadIn MODE1\n        EndLeadIn\n");
+   fprintf(fp, "        SystemArea \"IP.BIN\"\n");
+   fprintf(fp, "        Track MODE1\n");
+   fprintf(fp, "            Volume ISO9660 \"%s.PVD\"\n", stripEndWhiteSpace(pvd.VolumeIdentifier, sizeof(pvd.VolumeIdentifier)));
+   fprintf(fp, "                PrimaryVolume 0:2:16\n");
+   fprintf(fp, "                    SystemIdentifier            \"SEGA SEGASATURN\"\n");
+   fprintf(fp, "                    VolumeIdentifier            \"%s\"\n", stripEndWhiteSpace(pvd.VolumeIdentifier, sizeof(pvd.VolumeIdentifier)));
+   fprintf(fp, "                    VolumeSetIdentifier         \"%s\"\n", stripEndWhiteSpace(pvd.VolumeSetIdentifier, sizeof(pvd.VolumeSetIdentifier)));
+   fprintf(fp, "                    PublisherIdentifier         \"%s\"\n", stripEndWhiteSpace(pvd.PublisherIdentifier, sizeof(pvd.PublisherIdentifier)));
+   fprintf(fp, "                    DataPreparerIdentifier      \"%s\"\n", stripEndWhiteSpace(pvd.DataPreparerIdentifier, sizeof(pvd.DataPreparerIdentifier)));
+   fprintf(fp, "                    CopyrightFileIdentifier     \"%s\"\n", stripEndWhiteSpace(pvd.CopyrightFileIdentifier, sizeof(pvd.CopyrightFileIdentifier)));
+   fprintf(fp, "                    AbstractFileIdentifier      \"%s\"\n", stripEndWhiteSpace(pvd.AbstractFileIdentifier, sizeof(pvd.AbstractFileIdentifier)));
+   fprintf(fp, "                    BibliographicFileIdentifier \"%s\"\n", stripEndWhiteSpace(pvd.BibliographicFileIdentifier, sizeof(pvd.BibliographicFileIdentifier)));
 
 	if (oldTime)
 	{
@@ -297,67 +297,67 @@ bool DBClass::saveSCR(const char *filename, bool oldTime)
 		writeDate(fp, "VolumeEffectiveDate", pvd.VolumeEffectiveDateAndTime, sizeof(pvd.VolumeEffectiveDateAndTime));
 	}
 
-   fprintf(fp, "    EndPrimaryVolume\n");
-   fprintf(fp, "EndVolume\n\n");
+   fprintf(fp, "                EndPrimaryVolume\n");
+   fprintf(fp, "            EndVolume\n\n");
 
 	if (oldTime)
 	{
 		volumedatetime_struct vdt = filelist[0].getDateTime();
-		fprintf(fp, "    RecordingDate %02d/%02d/%04d %02d:%02d:%02d:%02d:%02d\n", vdt.Day, vdt.Month, 1900+vdt.Year, vdt.Hour, vdt.Minute, vdt.Second, 0, vdt.Zone);
+		//fprintf(fp, "            RecordingDate %02d/%02d/%04d %02d:%02d:%02d:%02d:%02d\n", vdt.Day, vdt.Month, 1900+vdt.Year, vdt.Hour, vdt.Minute, vdt.Second, 0, vdt.Zone);
 	}
 
 	// Mode 1 Track
-	doDirectoryMode1(fp, 0xFFFFFFFF, 1);
+	doDirectoryMode1(fp, 0xFFFFFFFF, 3);
 
 	// If there's any Mode 2 files, do a Mode 2 track
 	if (doMode2)
 	{
-		fprintf(fp, "    PostGap 75\n");
-		fprintf(fp, "EndTrack\n");
+		fprintf(fp, "            PostGap 75\n");
+		fprintf(fp, "        EndTrack\n");
 
-		fprintf(fp, "Track MODE2\n");
-		fprintf(fp, "    PreGap 150\n");
-		doDirectoryMode2(fp, 0xFFFFFFFF, 1);
+		fprintf(fp, "        Track MODE2\n");
+		fprintf(fp, "            PreGap 150\n");
+		doDirectoryMode2(fp, 0xFFFFFFFF, 3);
 	}
 
-   fprintf(fp, "    PostGap 150\n");
-   fprintf(fp, "EndTrack\n");
+   fprintf(fp, "            PostGap 150\n");
+   fprintf(fp, "        EndTrack\n");
 
    // Add CDDA tracks
    for (unsigned long i = 0; i < tracklist.size(); i++)
    {
       if (tracklist[i].getFlags() != TT_CDDA)
          continue;
-      fprintf(fp, "Track CDDA\n");
+      fprintf(fp, "        Track CDDA\n");
       
       // Find file in table here
       if (strcmp(tracklist[i].getFilename(), "") != 0)
       {
          // Use table filename
-         fprintf(fp, "    File %s\n", tracklist[i].getFilename());
+         fprintf(fp, "            File %s\n", tracklist[i].getFilename());
 			if (oldTime)
 			{
 				volumedatetime_struct vdt = tracklist[i].getDateTime();
-				fprintf(fp, "       RecordingDate %02d/%02d/%04d %02d:%02d:%02d:%02d:%02d\n", vdt.Day, vdt.Month, 1900+vdt.Year, vdt.Hour, vdt.Minute, vdt.Second, 0, vdt.Zone);
+				fprintf(fp, "                RecordingDate %02d/%02d/%04d %02d:%02d:%02d:%02d:%02d\n", vdt.Day, vdt.Month, 1900+vdt.Year, vdt.Hour, vdt.Minute, vdt.Second, 0, vdt.Zone);
 			}
-         fprintf(fp, "       FileSource \"%s\"\n", tracklist[i].getRealFilename());
-         fprintf(fp, "       EndFileSource\n");
-         fprintf(fp, "    EndFile\n");
+         fprintf(fp, "                FileSource \"%s\"\n", tracklist[i].getRealFilename());
+         fprintf(fp, "                EndFileSource\n");
+         fprintf(fp, "            EndFile\n");
       }
       else
       {
          // None exists, just create the track
-         fprintf(fp, "    FileSource \"%s\"\n", tracklist[i].getRealFilename());
-         fprintf(fp, "    EndFileSource\n");
+         fprintf(fp, "            FileSource \"%s\"\n", tracklist[i].getRealFilename());
+         fprintf(fp, "            EndFileSource\n");
       }
 
-      fprintf(fp, "EndTrack\n");
+      fprintf(fp, "        EndTrack\n");
    }
 
-   fprintf(fp, "LeadOut CDDA\n");
-   fprintf(fp, "    Empty 600\n");
-   fprintf(fp, "EndLeadOut\n");
-   fprintf(fp, "EndSession\n");
+   fprintf(fp, "        LeadOut CDDA\n");
+   fprintf(fp, "            Empty 600\n");
+   fprintf(fp, "        EndLeadOut\n");
+   fprintf(fp, "    EndSession\n");
    fprintf(fp, "EndDisc\n");
 
    fclose(fp);
@@ -450,11 +450,6 @@ void DBClass::addFile( dirrec_struct * dirrec, int i, ISOExtractClass *iec )
    if (char *p = strchr(realFilename, ';'))
       p[0] = '\0';
    filelist[cur].setRealFilename(realFilename);
-
-	if (strcmp(realFilename, "Files\\ADPCM\\DIR_COMM\\P010.XA") == 0)
-	{
-		printf("temp\n");
-	}
 
    if (dirrec[i].XAAttributes.attributes != 0)
    {

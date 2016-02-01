@@ -34,6 +34,7 @@ int main( int argc, char** argv )
    bool isDisc=false;
    bool extractFiles=false;
 	bool oldTime=false;
+	ISOExtractClass::SORTTYPE sortType = ISOExtractClass::SORT_BY_DIRREC;
 
    if (argc < 2)
    {
@@ -50,6 +51,8 @@ int main( int argc, char** argv )
       }
 		else if (strncmp(argv[i], "--oldtime", strlen("--oldtime")) == 0)
 			oldTime = true;
+		else if (strncmp(argv[i], "--sortbylba", strlen("--sortbylba")) == 0)
+			sortType = ISOExtractClass::SORT_BY_LBA;
 		else
 		{
 			DWORD ret = GetFileAttributesA(argv[i]);
@@ -64,6 +67,8 @@ int main( int argc, char** argv )
 
    printf("Extracting disc %s to %s...", discPath, outPath);
 	iec.setMaintainOldTime(oldTime);
+
+	iec.setSortType(sortType);
 
    if (!iec.importDisc(discPath, outPath, &curdb))
    {

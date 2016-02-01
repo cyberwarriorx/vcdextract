@@ -34,6 +34,13 @@ typedef struct
 
 class ISOExtractClass
 {
+public:
+	enum SORTTYPE
+	{
+		SORT_BY_DIRREC=0,
+		SORT_BY_LBA=1,
+	};
+
 private:
 	enum IMAGETYPE
 	{
@@ -42,6 +49,7 @@ private:
 	};
 
 	ISOExtractClass::IMAGETYPE imageType;
+	ISOExtractClass::SORTTYPE sortType;
 	FILE *imageFp;
 	bool oldTime;
 	int extractIP(const char *dir);
@@ -66,6 +74,7 @@ public:
 	int readRawSector(int offset, unsigned char *buffer, int *readsize);
 	int readUserSector(int offset, unsigned char *buffer, int *readsize);
 	int readSectorSubheader(int offset, xa_subheader_struct *subheader);
+	void setSortType(ISOExtractClass::SORTTYPE sortType);
 };
 
 #endif
