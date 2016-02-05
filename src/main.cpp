@@ -65,7 +65,7 @@ int main( int argc, char** argv )
    DBClass curdb;
    ISOExtractClass iec;
 
-   printf("Extracting disc %s to %s...", discPath, outPath);
+   printf("Extracting disc %s to %s...\n", discPath, outPath);
 	iec.setMaintainOldTime(oldTime);
 
 	iec.setSortType(sortType);

@@ -74,6 +74,7 @@ private:
    char *stripEndWhiteSpace(unsigned char *string, int length);
 	void doDirectoryMode1(FILE *fp, int dirIndex, int level);
 	void doDirectoryMode2(FILE *fp, int dirIndex, int level);
+	unsigned int dateStrToValue(unsigned char *value, int size);
 	void writeDate(FILE *fp, char *string, unsigned char *value, size_t value_size);
 public:
    DBClass();

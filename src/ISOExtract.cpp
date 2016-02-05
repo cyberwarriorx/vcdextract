@@ -516,6 +516,9 @@ int ISOExtractClass::extractFiles(cdinfo_struct *cdinfo, dirrec_struct *dirrec, 
             goto error;
          }
 
+			//LARGE_INTEGER time1, time2, freq;
+			//QueryPerformanceFrequency(&freq);
+			//QueryPerformanceCounter(&time1);
          for (unsigned long i2 = 0; i2 < dirrec[i].DataLengthL; i2+=2048)
          {
 				printf("\r%s:(%ld/%ld)", dirrec[i].FileIdentifier, i2/2048, dirrec[i].DataLengthL/2048);
@@ -536,7 +539,10 @@ int ISOExtractClass::extractFiles(cdinfo_struct *cdinfo, dirrec_struct *dirrec, 
             }
          }
 
-			printf("\r%s:(%ld/%ld)...done.", dirrec[i].FileIdentifier, dirrec[i].DataLengthL/2048, dirrec[i].DataLengthL/2048);
+			printf("\r%s:(%ld/%ld)...done.\n", dirrec[i].FileIdentifier, dirrec[i].DataLengthL/2048, dirrec[i].DataLengthL/2048);
+			//QueryPerformanceCounter(&time2);
+			//float time=(float)(time2.QuadPart-time1.QuadPart)/(float)freq.QuadPart;
+			//printf("time = %f sec(%f sectors/s)", dirrec[i].FileIdentifier, dirrec[i].DataLengthL/2048, dirrec[i].DataLengthL/2048, time, dirrec[i].DataLengthL/2048 / time);
 			printf("\n");
 
 			setPathSaveTime(hOutput, &dirrec[i]);
@@ -867,6 +873,7 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
    char dlfdir[MAX_PATH];
 
    memset(&cdinfo, 0, sizeof(cdinfo));
+	imageFp = NULL;
 
    // Read cue file and figure out where bin file is
    if ((p = strrchr((char *)filename, '.')) == NULL)

@@ -238,12 +238,26 @@ void DBClass::doDirectoryMode2(FILE *fp, int dirIndex, int level)
 	}
 }
 
+unsigned int DBClass::dateStrToValue(unsigned char *value, int size)
+{
+	char tmp[5];
+	memcpy(tmp, value, size);
+	tmp[size] = '\0';
+	return (unsigned int)strtol(tmp, NULL, 10);
+}
+
 void DBClass::writeDate(FILE *fp, char *string, unsigned char *value, size_t value_size)
 {
-	int year,month,day,hour,min,second,ms,gmt;
+	unsigned int year,month,day,hour,min,second,ms,gmt;	
+	year = dateStrToValue(value, 4);
+	month = dateStrToValue(value+4, 2);
+	day = dateStrToValue(value+6, 2);
+	hour = dateStrToValue(value+8, 2);
+	min = dateStrToValue(value+10, 2);
+	second = dateStrToValue(value+12, 2);
+	ms = dateStrToValue(value+14, 2);
 	gmt=value[16];
-	char *ptr=stripEndWhiteSpace(value, value_size);
-	sscanf(ptr, "%04d%02d%02d%02d%02d%02d%02d", &year, &month, &day, &hour, &min, &second, &ms);
+
 	if (year && month && day)
 	   fprintf(fp, "                    %-27s %02d/%02d/%04d %02d:%02d:%02d:%02d:%02d\n", string, day, month, year, hour, min, second, ms, gmt);
 }
