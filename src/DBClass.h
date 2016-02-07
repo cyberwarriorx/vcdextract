@@ -47,9 +47,11 @@ enum tracktype
 
 typedef struct
 {
+	unsigned int fadstart;
+	unsigned int fadend;
    unsigned int fileoffset;
+	unsigned int sectorsize;
    tracktype type;
-   unsigned int fadstart;
    char filename[MAX_PATH];
 } trackinfo_struct;
 

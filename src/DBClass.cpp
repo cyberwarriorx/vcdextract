@@ -124,11 +124,6 @@ void DBClass::doDirectoryMode1(FILE *fp, int dirIndex, int level)
 			continue;
 		}
 
-		if (strcmp(filelist[i].getRealFilename(), "Files\\ADPCM\\DIR_COMM\\P010.XA") == 0)
-		{
-			printf("temp\n");
-		}
-
 		if (filelist[i].getParent() == dirIndex)
 		{
 			if (filelist[i].getFlags() & ISOATTR_DIRECTORY)
@@ -417,7 +412,7 @@ void DBClass::setPVD( pvd_struct * pvd )
 void DBClass::addFile( dirrec_struct * dirrec, int i, ISOExtractClass *iec )
 {
    filelist.push_back(FileListClass());
-   unsigned long cur=filelist.size()-1;
+   unsigned long cur=(unsigned long)filelist.size()-1;
    
    filelist[cur].setFilename((const char *)dirrec[i].FileIdentifier);
    filelist[cur].setLBA(dirrec[i].LocationOfExtentL);
@@ -564,7 +559,7 @@ void DBClass::addTrack( trackinfo_struct *trackinfo, int i)
    tracklist[cur].setFilename("");
    for (unsigned long j = 0; j < filelist.size(); j++)
    {
-      if (filelist[j].getLBA() == trackinfo->fadstart)
+      if (filelist[j].getLBA()+150 == trackinfo->fadstart)
 		{
          tracklist[cur].setFilename(filelist[j].getFilename());
 			if (oldTime)

@@ -48,6 +48,9 @@ private:
 		IT_ISO
 	};
 
+	int time_sectors;
+	cdinfo_struct cdinfo;
+
 	ISOExtractClass::IMAGETYPE imageType;
 	ISOExtractClass::SORTTYPE sortType;
 	FILE *imageFp;
@@ -60,10 +63,10 @@ private:
 	int readDirRecords(unsigned long lba, unsigned long dirrecsize, dirrec_struct **dirrec, unsigned long *numdirrec, unsigned long parent);
 	int loadCompleteRecordSet(pvd_struct *pvd, dirrec_struct **dirrec, unsigned long *numdirrec);
 	void setPathSaveTime(HANDLE hPath, dirrec_struct *dirrec);
-	int extractFiles(cdinfo_struct *cdinfo, dirrec_struct *dirrec, unsigned long numdirrec, const char *dir);
+	int extractFiles(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir);
 	int createPaths(const char *dir, ptr_struct *ptr, int numptr, dirrec_struct *dirrec, unsigned long numdirrec);
-	int extractCDDA(cdinfo_struct *cdinfo, dirrec_struct *dirrec, unsigned long numdirrec, const char *dir);
-	int createDB(cdinfo_struct *cdinfo, pvd_struct *pvd, dirrec_struct *dirrec, unsigned long numdirrec, DBClass *db);
+	int extractCDDA(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir);
+	int createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned long numdirrec, DBClass *db);
    int parseCueFile(const char *filename, cdinfo_struct *cdinfo);
    void MakeCuePathFilename(const char *filename, const char *cueFilename, char *outFilename);
 public:
@@ -72,7 +75,8 @@ public:
 	void setMaintainOldTime(bool oldTime);
    int importDisc(const char *filename, const char *dir, DBClass *db);
 	int readRawSector(int offset, unsigned char *buffer, int *readsize);
-	int readUserSector(int offset, unsigned char *buffer, int *readsize);
+	trackinfo_struct *FADToTrack(int FAD);
+	int readUserSector(int offset, unsigned char *buffer, int *readsize, trackinfo_struct *track=NULL);
 	int readSectorSubheader(int offset, xa_subheader_struct *subheader);
 	void setSortType(ISOExtractClass::SORTTYPE sortType);
 };
