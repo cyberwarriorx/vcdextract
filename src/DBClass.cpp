@@ -1,4 +1,4 @@
-/*  Copyright 2013-2015 Theo Berkau
+/*  Copyright 2013-2016 Theo Berkau
 
     This file is part of VCDEXTRACT.
 
@@ -470,8 +470,8 @@ void DBClass::addFile( dirrec_struct * dirrec, int i, ISOExtractClass *iec )
 		{
 			int readsize=0;
 			xa_subheader_struct subheader[2];
-			iec->readSectorSubheader(dirrec[i].LocationOfExtentL, subheader);
-			iec->readSectorSubheader(dirrec[i].LocationOfExtentL+1, subheader+1);
+			iec->readSectorSubheader(dirrec[i].LocationOfExtentL+150, subheader);
+			iec->readSectorSubheader(dirrec[i].LocationOfExtentL+151, subheader+1);
 
 			filelist[cur].setFlags(dirrec[i].FileFlags | FF_MODE2);
 
@@ -551,7 +551,7 @@ void DBClass::clearFiles()
 void DBClass::addTrack( trackinfo_struct *trackinfo, int i)
 {
    tracklist.push_back(FileListClass());
-   unsigned long cur=tracklist.size()-1;
+   unsigned long cur=(unsigned long)tracklist.size()-1;
    char realFilename[MAX_PATH];
 
    sprintf(realFilename, "CDDA\\track%02d.bin", i+1);

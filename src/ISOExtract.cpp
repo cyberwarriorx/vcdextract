@@ -1,4 +1,4 @@
-/*  Copyright 2013-2015 Theo Berkau
+/*  Copyright 2013-2016 Theo Berkau
 
     This file is part of VCDEXTRACT.
 
@@ -41,32 +41,39 @@ void ISOExtractClass::setMaintainOldTime(bool oldTime)
 	this->oldTime = oldTime;
 }
 
-int ISOExtractClass::readRawSector(int offset, unsigned char *buffer, int *readsize)
+int ISOExtractClass::readRawSector(unsigned int FAD, unsigned char *buffer, int *readsize, trackinfo_struct *track)
 {
-	if (imageType == IT_BINCUE)
+	if (track == NULL)
+		track = FADToTrack(FAD);
+
+	if (imageType != IT_ISO)
 	{
-		fseek(imageFp, (offset * 2352), SEEK_SET); 
-		if ((readsize[0] = (int)fread(buffer, sizeof(unsigned char), 2352, imageFp)) != 2352)
+		fseek(track->fp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
+		if ((readsize[0] = (int)fread(buffer, sizeof(unsigned char), 2352, track->fp)) != 2352)
 			return FALSE;
+		return TRUE;
 	}
 
-	return TRUE;
+	return FALSE;
 }
 
-int ISOExtractClass::readSectorSubheader(int offset, xa_subheader_struct *subheader)
+int ISOExtractClass::readSectorSubheader(unsigned int FAD, xa_subheader_struct *subheader, trackinfo_struct *track)
 {
-	if (imageType == IT_BINCUE)
+	if (track == NULL)
+		track = FADToTrack(FAD);
+
+	if (imageType != IT_ISO)
 	{
-		fseek(imageFp, (offset * 2352)+16, SEEK_SET); 
-		if ((fread(subheader, sizeof(unsigned char), sizeof(xa_subheader_struct), imageFp)) != sizeof(xa_subheader_struct))
+		fseek(track->fp, (track->fileoffset + (FAD-track->fadstart) * track->sectorsize) + 16, SEEK_SET); 
+		if ((fread(subheader, sizeof(unsigned char), sizeof(xa_subheader_struct), track->fp)) != sizeof(xa_subheader_struct))
 			return FALSE;
 		return TRUE;
 	}   
 
-	return TRUE;
+	return FALSE;
 }
 
-trackinfo_struct *ISOExtractClass::FADToTrack(int FAD)
+trackinfo_struct *ISOExtractClass::FADToTrack(unsigned int FAD)
 {
 	trackinfo_struct *track;
 
@@ -92,20 +99,20 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 	if (track == NULL)
 		track = FADToTrack(FAD);
 
-	if (imageType == IT_BINCUE)
+	if (imageType != IT_ISO)
    {
       unsigned char sync[12];
       static unsigned char truesync[12] = { 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00 };
 
-		fseek(imageFp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
-      if (fread((void *)sync, sizeof(unsigned char), 12, imageFp) != 12)
+		fseek(track->fp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
+      if (fread((void *)sync, sizeof(unsigned char), 12, track->fp) != 12)
          return FALSE;
 
       if (memcmp(sync, truesync, 12) == 0)
       {
          // Data sector
 			unsigned char buf[4];
-			fread(buf, 1, 4, imageFp);
+			fread(buf, 1, 4, track->fp);
          mode = buf[3];
          if (mode == 1)
             size = 2048;
@@ -114,7 +121,7 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 				// Figure it out based on subheader
 				xa_subheader_struct subheader;
 
-				if ((fread(&subheader, sizeof(unsigned char), sizeof(xa_subheader_struct), imageFp)) != sizeof(xa_subheader_struct))
+				if ((fread(&subheader, sizeof(unsigned char), sizeof(xa_subheader_struct), track->fp)) != sizeof(xa_subheader_struct))
 					return FALSE;
 
             if (subheader.sm & XAFLAG_FORM2)
@@ -127,7 +134,7 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
             else
                size = 2048;
 
-            fseek(imageFp, 4, SEEK_CUR);
+            fseek(track->fp, 4, SEEK_CUR);
          }
          else
             return FALSE;
@@ -135,17 +142,17 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
       else
       {
          // Audio sector
-         fseek(imageFp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
+         fseek(track->fp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
          size = track->sectorsize;
       }
    }
    else
    {
-      fseek(imageFp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
+      fseek(track->fp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
       size = track->sectorsize;
    }
 
-   if ((readsize[0] = (int)fread(buffer, sizeof(unsigned char), size, imageFp)) != size)
+   if ((readsize[0] = (int)fread(buffer, sizeof(unsigned char), size, track->fp)) != size)
       return FALSE;
    return TRUE;
 }
@@ -742,21 +749,17 @@ int ISOExtractClass::createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned l
    return TRUE;
 }
 
-int ISOExtractClass::parseCueFile(const char *filename, cdinfo_struct *cdinfo)
+int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 {
-   FILE *fp;
    char text[MAX_PATH*2];
    int tracknum=0, indexnum, min, sec, frame, pregap=0;
-
-   if ((fp = fopen(filename, "rt")) == NULL)
-      goto error;
 
    if (fscanf(fp, "FILE \"%*[^\"]\" %*s\r\n") == EOF)
       goto error;
 
-   cdinfo->numtracks = 1;
-   cdinfo->trackinfo = (trackinfo_struct *)malloc(100*sizeof(trackinfo_struct));
-   if (!cdinfo->trackinfo)
+   cdinfo.numtracks = 1;
+   cdinfo.trackinfo = (trackinfo_struct *)malloc(100*sizeof(trackinfo_struct));
+   if (!cdinfo.trackinfo)
       goto error;
 
    for (;;)
@@ -772,28 +775,28 @@ int ISOExtractClass::parseCueFile(const char *filename, cdinfo_struct *cdinfo)
          if (fscanf(fp, "%d %[^\r\n]\r\n", &tracknum, text) == EOF)
             break;
 
-         if (tracknum > cdinfo->numtracks)
+         if (tracknum > cdinfo.numtracks)
          {
             // Reallocate buffer
             trackinfo_struct *trackinfo = (trackinfo_struct *)malloc((tracknum+1)*sizeof(trackinfo_struct));
             if (trackinfo == NULL)
                goto error;
-            memcpy(trackinfo, cdinfo->trackinfo, sizeof(trackinfo_struct)*cdinfo->numtracks);
-            free(cdinfo->trackinfo);
-            cdinfo->trackinfo = trackinfo;
-            cdinfo->numtracks = tracknum;
+            memcpy(trackinfo, cdinfo.trackinfo, sizeof(trackinfo_struct)*cdinfo.numtracks);
+            free(cdinfo.trackinfo);
+            cdinfo.trackinfo = trackinfo;
+            cdinfo.numtracks = tracknum;
          }
          if (strncmp(text, "MODE1", 5) == 0 ||
              strncmp(text, "MODE2", 5) == 0)
          {
             // Figure out the track sector size
-				cdinfo->trackinfo[tracknum-1].sectorsize = atoi(text + 6);
-            cdinfo->trackinfo[tracknum-1].type = (tracktype)(text[4]-'0');
+				cdinfo.trackinfo[tracknum-1].sectorsize = atoi(text + 6);
+            cdinfo.trackinfo[tracknum-1].type = (tracktype)(text[4]-'0');
          }
          else if (strncmp(text, "AUDIO", 5) == 0)
 			{
-				cdinfo->trackinfo[tracknum-1].sectorsize = 2352;
-            cdinfo->trackinfo[tracknum-1].type = TT_CDDA;
+				cdinfo.trackinfo[tracknum-1].sectorsize = 2352;
+            cdinfo.trackinfo[tracknum-1].type = TT_CDDA;
 			}
       }
       else if (strncmp(text, "INDEX", 5) == 0)
@@ -806,8 +809,8 @@ int ISOExtractClass::parseCueFile(const char *filename, cdinfo_struct *cdinfo)
          if (indexnum == 1)
          {
             // Update toc entry
-				cdinfo->trackinfo[tracknum-1].fadstart = (MSF_TO_FAD(min, sec, frame) + pregap + 150);
-				cdinfo->trackinfo[tracknum-1].fileoffset = MSF_TO_FAD(min, sec, frame) * cdinfo->trackinfo[tracknum-1].sectorsize;
+				cdinfo.trackinfo[tracknum-1].fadstart = (MSF_TO_FAD(min, sec, frame) + pregap + 150);
+				cdinfo.trackinfo[tracknum-1].fileoffset = MSF_TO_FAD(min, sec, frame) * cdinfo.trackinfo[tracknum-1].sectorsize;
          }
       }
       else if (strncmp(text, "PREGAP", 5) == 0)
@@ -830,43 +833,486 @@ int ISOExtractClass::parseCueFile(const char *filename, cdinfo_struct *cdinfo)
 
    }
 
-	cdinfo->trackinfo[tracknum].fileoffset = 0;
-	cdinfo->trackinfo[tracknum].fadstart = 0xFFFFFFFF;
+	cdinfo.trackinfo[tracknum].fileoffset = 0;
+	cdinfo.trackinfo[tracknum].fadstart = 0xFFFFFFFF;
 
 	// Go back, retrieve image filename
 	fseek(fp, 0, SEEK_SET);
-	fscanf(fp, "FILE \"%[^\"]\" %*s\r\n", cdinfo->trackinfo[0].filename);   
+	fscanf(fp, "FILE \"%[^\"]\" %*s\r\n", cdinfo.trackinfo[0].filename);   
 
+	FILE *imageFp;
 	// Now go and open up the image file, figure out its size, etc.
-	struct _stat st;
-	if (_stat(cdinfo->trackinfo[0].filename, &st) != 0)
+	if ((imageFp = fopen(cdinfo.trackinfo[0].filename, "rb")) == NULL)
 	{
+		// try stripping off path and use the same path as cue file
 		char newFilename[MAX_PATH];
 
-		MakeCuePathFilename(cdinfo->trackinfo[0].filename, filename, newFilename);
-		if (_stat(newFilename, &st) != 0)
+		MakeCuePathFilename(cdinfo.trackinfo[0].filename, filename, newFilename);
+
+		if ((imageFp = fopen(newFilename, "rb")) == NULL)
 		{
-			cdinfo->trackinfo[tracknum].fileoffset = 0xFFFFFFFF;
-			cdinfo->trackinfo[tracknum].fadstart = 0xFFFFFFFF;
-			return TRUE;
+			cdinfo.trackinfo[tracknum].fileoffset = 0xFFFFFFFF;
+			cdinfo.trackinfo[tracknum].fadstart = 0xFFFFFFFF;
+			goto error;
 		}
 	}
 
-	for (int i = 0; i < tracknum; i++)
-		cdinfo->trackinfo[i].fadend = cdinfo->trackinfo[i+1].fadstart-1;
+	struct _stat st;
+	_stat(cdinfo.trackinfo[0].filename, &st);
 
-	cdinfo->trackinfo[tracknum-1].fadend = cdinfo->trackinfo[tracknum-1].fadstart+
-		                                    (st.st_size-cdinfo->trackinfo[tracknum-1].fileoffset)/cdinfo->trackinfo[tracknum-1].sectorsize;
+	for (int i = 0; i < tracknum; i++)
+	{
+		cdinfo.trackinfo[i].fp = imageFp;
+		cdinfo.trackinfo[i].fadend = cdinfo.trackinfo[i+1].fadstart-1;
+	}
+
+	cdinfo.trackinfo[tracknum-1].fadend = cdinfo.trackinfo[tracknum-1].fadstart+
+		                                    (st.st_size-cdinfo.trackinfo[tracknum-1].fileoffset)/cdinfo.trackinfo[tracknum-1].sectorsize;
 	fclose(fp);
+
 
    return TRUE;
 
 error:
-   if (cdinfo->trackinfo)
-      free(cdinfo->trackinfo);
+   if (cdinfo.trackinfo)
+      free(cdinfo.trackinfo);
    if (fp)
       fclose(fp);
    return FALSE;
+}
+
+enum tracktype ISOExtractClass::getTrackType(uint64_t offset, FILE *fp)
+{
+	unsigned char header[16];
+	static unsigned char sync[12] = { 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00 };
+
+	fseek(fp, (long)offset, SEEK_SET);
+	fread((void *)header, 1, sizeof(header), fp);
+	if (memcmp(header, sync, 12) == 0)
+	{
+		if (header[15] == 0x01)
+			return TT_MODE1;
+		else if (header[15] == 0x02)
+			return TT_MODE2;
+		else
+			return TT_MODE0;
+	}
+	else
+		return TT_CDDA;
+}
+
+int ISOExtractClass::loadMDSTracks(const char *mdsFilename, FILE *isoFile, mds_session_struct *mdsSession)
+{
+	int i;
+	int track_num=0;
+	uint32_t fadend;
+
+	cdinfo.trackinfo = (trackinfo_struct *)malloc(sizeof(trackinfo_struct) * mdsSession->lastTrack);
+	if (cdinfo.trackinfo == NULL)
+		return -1;
+
+	memset(cdinfo.trackinfo, 0, sizeof(trackinfo_struct) * mdsSession->lastTrack);
+
+	for (i = 0; i < mdsSession->totalBlocks; i++)
+	{
+		mds_track_struct track;
+		FILE *fp=NULL;
+		int file_size = 0;
+
+		fseek(isoFile, mdsSession->trackBlocksOffset + i * sizeof(mds_track_struct), SEEK_SET);
+		if (fread(&track, 1, sizeof(mds_track_struct), isoFile) != sizeof(mds_track_struct))
+		{
+			free(cdinfo.trackinfo);
+			return -1;
+		}
+
+		if (track.track_num == 0xA2)
+			fadend = MSF_TO_FAD(track.m, track.s, track.f);
+		if (!track.extra_offset)
+			continue;
+
+		if (track.footer_offset)
+		{
+			mds_footer_struct footer;
+			int found_dupe=0;
+			int j;
+
+			// Make sure we haven't already opened file already
+			for (j = 0; j < track_num; j++)
+			{
+				if (track.footer_offset == cdinfo.trackinfo[j].fileid)
+				{
+					found_dupe = 1;
+					break;
+				}
+			}
+
+			if (found_dupe)
+			{
+				fp = cdinfo.trackinfo[j].fp;
+				file_size = cdinfo.trackinfo[j].filesize;
+			}
+			else
+			{
+				fseek(isoFile, track.footer_offset, SEEK_SET);
+				if (fread(&footer, 1, sizeof(mds_footer_struct), isoFile) != sizeof(mds_footer_struct))
+				{
+					free(cdinfo.trackinfo);
+					return -1;
+				}
+
+				fseek(isoFile, footer.filename_offset, SEEK_SET);
+				if (footer.is_widechar)
+				{
+					wchar_t filename[512];
+					wchar_t img_filename[512];
+					memset(img_filename, 0, 512 * sizeof(wchar_t));
+
+					if (fwscanf(isoFile, L"%512c", img_filename) != 1)
+					{
+						free(cdinfo.trackinfo);
+						return -1;
+					}
+
+					if (wcsncmp(img_filename, L"*.", 2) == 0)
+					{
+						wchar_t *ext;
+						swprintf(filename, sizeof(filename)/sizeof(wchar_t), L"%S", mdsFilename);
+						ext = wcsrchr(filename, '.');
+						wcscpy(ext, img_filename+1);
+					}
+					else
+						wcscpy(filename, img_filename);
+
+					fp = _wfopen(filename, L"rb");
+				}
+				else
+				{
+					char filename[512];
+					char img_filename[512];
+					memset(img_filename, 0, 512);
+
+					if (fscanf(isoFile, "%512c", img_filename) != 1)
+					{
+						free(cdinfo.trackinfo);
+						return -1;
+					}
+
+					if (strncmp(img_filename, "*.", 2) == 0)
+					{
+						char *ext;
+						strcpy(filename, mdsFilename);
+						ext = strrchr(filename, '.');
+						strcpy(ext, img_filename+1);
+					}
+					else
+						strcpy(filename, img_filename);
+
+					fp = fopen(filename, "rb");
+				}
+
+				if (fp == NULL)
+				{
+					free(cdinfo.trackinfo);
+					return -1;
+				}
+
+				fseek(fp, 0, SEEK_END);
+				file_size = ftell(fp);
+				fseek(fp, 0, SEEK_SET);
+			}
+		}
+
+		cdinfo.trackinfo[track_num].type = getTrackType(track.start_offset, fp);
+		cdinfo.trackinfo[track_num].fadstart = track.start_sector+150;
+		if (track_num > 0)
+			cdinfo.trackinfo[track_num-1].fadend = cdinfo.trackinfo[track_num].fadstart;
+		cdinfo.trackinfo[track_num].fileoffset = (unsigned int)track.start_offset;
+		cdinfo.trackinfo[track_num].sectorsize = track.sector_size;
+		cdinfo.trackinfo[track_num].fp = fp;
+		cdinfo.trackinfo[track_num].filesize = file_size;
+		cdinfo.trackinfo[track_num].fileid = track.footer_offset;
+		cdinfo.trackinfo[track_num].interleavedsub = track.subchannel_mode != 0 ? 1 : 0;
+
+		track_num++;
+	}
+
+	cdinfo.trackinfo[track_num-1].fadend = fadend;
+	cdinfo.numtracks = track_num;
+	return 0;
+}
+
+int ISOExtractClass::parseMDS(const char *mds_filename, FILE *iso_file)
+{
+	int32_t i;
+	mds_header_struct header;
+
+	fseek(iso_file, 0, SEEK_SET);
+
+	if (fread((void *)&header, 1, sizeof(mds_header_struct), iso_file) != sizeof(mds_header_struct))
+		return -1;
+	else if (memcmp(&header.signature,  "MEDIA DESCRIPTOR", sizeof(header.signature)))
+		return -1;
+	else if (header.version[0] > 1)
+		return -1;
+
+	if (header.medium_type & 0x10)
+	{
+		// DVD's aren't supported, nor will they ever be
+		return -1;
+	}
+
+	for (i = 0; i < 1; i++)
+	{
+		mds_session_struct session;
+
+		fseek(iso_file, header.sessions_blocks_offset + i * sizeof(mds_session_struct), SEEK_SET);
+		if (fread(&session, 1, sizeof(mds_session_struct), iso_file) != sizeof(mds_session_struct))
+		{
+			return -1;
+		}
+
+		if (loadMDSTracks(mds_filename, iso_file, &session) != 0)
+			return -1;
+	}
+
+	fclose(iso_file);
+
+	return 0;
+}
+
+char* StripPreSuffixWhitespace(char* string)
+{
+	char* p;
+	for (;;)
+	{
+		if (string[0] == 0 || !isspace(string[0]))
+			break;
+		string++;
+	}
+
+	if (strlen(string) == 0)
+		return string;
+
+	p = string+strlen(string)-1;
+	for (;;)
+	{
+		if (p <= string || !isspace(p[0]))
+		{
+			p[1] = '\0';
+			break;
+		}
+		p--;
+	}
+
+	return string;
+}
+
+int ISOExtractClass::loadParseCCD(FILE *ccd_fp, ccd_struct *ccd)
+{
+	char text[60], section[CCD_MAX_SECTION], old_name[CCD_MAX_NAME] = "";
+	char * start, *end, *name, *value;
+	int lineno = 0, error = 0, max_size = 100;
+
+	ccd->dict = (ccd_dict_struct *)malloc(sizeof(ccd_dict_struct)*max_size);
+	if (ccd->dict == NULL) 
+		return -1;
+
+	ccd->num_dict = 0;
+
+	// Read CCD file
+	while (fgets(text, sizeof(text), ccd_fp) != NULL) 
+	{
+		lineno++;
+
+		start = StripPreSuffixWhitespace(text);
+
+		if (start[0] == '[') 
+		{
+			// Section
+			end = strchr(start+1, ']');
+			if (end == NULL) 
+			{
+				// ] missing from section
+				error = lineno;
+			}
+			else
+			{
+				end[0] = '\0';
+				memset(section, 0, sizeof(section));
+				strncpy(section, start + 1, sizeof(section));
+				old_name[0] = '\0';
+			}
+		}
+		else if (start[0]) 
+		{
+			// Name/Value pair
+			end = strchr(start, '=');
+			if (end) 
+			{
+				end[0] = '\0';
+				name = StripPreSuffixWhitespace(start);
+				value = StripPreSuffixWhitespace(end + 1);
+
+				memset(old_name, 0, sizeof(old_name));
+				strncpy(old_name, name, sizeof(old_name));
+				if (ccd->num_dict+1 > max_size)
+				{
+					max_size *= 2;
+					ccd->dict = (ccd_dict_struct *)realloc(ccd->dict, sizeof(ccd_dict_struct)*max_size);
+					if (ccd->dict == NULL)
+					{
+						free(ccd->dict);
+						return -2;
+					}
+				}
+				strcpy(ccd->dict[ccd->num_dict].section, section);
+				strcpy(ccd->dict[ccd->num_dict].name, name);
+				strcpy(ccd->dict[ccd->num_dict].value, value);
+				ccd->num_dict++;
+			}
+			else
+				error = lineno;
+		}
+
+		if (error)
+			break;
+	}
+
+	if (error)
+	{
+		free(ccd->dict);
+		ccd->num_dict = 0;
+	}
+
+	return error;
+}
+
+int ISOExtractClass::GetIntCCD(ccd_struct *ccd, char *section, char *name)
+{
+	int i;
+	for (i = 0; i < ccd->num_dict; i++)
+	{
+		if (stricmp(ccd->dict[i].section, section) == 0 &&
+			stricmp(ccd->dict[i].name, name) == 0)
+			return strtol(ccd->dict[i].value, NULL, 0);
+	}
+
+	return -1;
+}
+
+int ISOExtractClass::parseCCD(const char *ccd_filename, FILE *iso_file)
+{
+	int i;
+	ccd_struct ccd;
+	int num_toc;
+	char img_filename[512];
+	char *ext;
+	FILE *fp;
+
+	strcpy(img_filename, ccd_filename);
+	ext = strrchr(img_filename, '.');
+	strcpy(ext, ".img");
+	fp = fopen(img_filename, "rb");
+
+	if (fp == NULL)
+		return -1;
+
+	fseek(iso_file, 0, SEEK_SET);
+
+	// Load CCD file as dictionary
+	if (loadParseCCD(iso_file, &ccd))
+	{
+		fclose(fp);
+		return -1;
+	}
+
+	num_toc = GetIntCCD(&ccd, "DISC", "TocEntries");
+
+	if (GetIntCCD(&ccd, "DISC", "DataTracksScrambled"))
+	{
+		fclose(fp);
+		free(ccd.dict);
+		return -1;
+	}
+
+	// Find track number and allocate
+	for (i = 0; i < num_toc; i++)
+	{
+		char sect_name[64];
+		int point;
+
+		sprintf(sect_name, "Entry %d", i);
+		point = GetIntCCD(&ccd, sect_name, "Point");
+
+		if (point == 0xA1)
+		{
+			int ses = GetIntCCD(&ccd, sect_name, "Session");
+
+			if (ses != 1)
+				continue;
+
+			cdinfo.numtracks=GetIntCCD(&ccd, sect_name, "PMin");;
+			cdinfo.trackinfo = (trackinfo_struct *)malloc(cdinfo.numtracks * sizeof(trackinfo_struct));
+			if (cdinfo.trackinfo == NULL)
+			{
+				fclose(fp);
+				free(ccd.dict);
+				return -1;
+			}
+			memset(cdinfo.trackinfo, 0, cdinfo.numtracks * sizeof(trackinfo_struct));
+		}
+	}
+
+	// Load TOC
+	for (i = 0; i < num_toc; i++)
+	{
+		char sect_name[64];
+		int ses, point, adr, control, trackno, amin, asec, aframe;
+		int alba, zero, pmin, psec, pframe, plba;
+
+		sprintf(sect_name, "Entry %d", i);
+
+		ses = GetIntCCD(&ccd, sect_name, "Session");
+		point = GetIntCCD(&ccd, sect_name, "Point");
+		adr = GetIntCCD(&ccd, sect_name, "ADR");
+		control = GetIntCCD(&ccd, sect_name, "Control");
+		trackno = GetIntCCD(&ccd, sect_name, "TrackNo");
+		amin = GetIntCCD(&ccd, sect_name, "AMin");
+		asec = GetIntCCD(&ccd, sect_name, "ASec");
+		aframe = GetIntCCD(&ccd, sect_name, "AFrame");
+		alba = GetIntCCD(&ccd, sect_name, "ALBA");
+		zero = GetIntCCD(&ccd, sect_name, "Zero");
+		pmin = GetIntCCD(&ccd, sect_name, "PMin");
+		psec = GetIntCCD(&ccd, sect_name, "PSec");
+		pframe = GetIntCCD(&ccd, sect_name, "PFrame");
+		plba = GetIntCCD(&ccd, sect_name, "PLBA");
+
+		if (ses != 1)
+			// Multi-session not supported
+			continue;
+
+		if(point >= 1 && point <= 99)
+		{
+			trackinfo_struct *track=&cdinfo.trackinfo[point-1];
+			track->type = getTrackType(plba*2352, fp);
+			track->fadstart = MSF_TO_FAD(pmin, psec, pframe);
+			if (point >= 2)
+				cdinfo.trackinfo[point-2].fadend = track->fadstart-1;
+			track->fileoffset = plba*2352;
+			track->sectorsize = 2352;
+			track->fp = fp;
+			track->filesize = (track->fadend+1-track->fadstart)*2352;
+			track->fileid = 0;
+			track->interleavedsub = 0;
+		}
+		else if (point == 0xA2)
+			cdinfo.trackinfo[cdinfo.numtracks-1].fadend = MSF_TO_FAD(pmin, psec, pframe);
+	}
+
+	fclose(iso_file);
+
+	return 0;
 }
 
 void ISOExtractClass::MakeCuePathFilename(const char *filename, const char *cueFilename, char *outFilename)
@@ -895,6 +1341,27 @@ void ISOExtractClass::MakeCuePathFilename(const char *filename, const char *cueF
       strcpy(outFilename, file);
 }
 
+void ISOExtractClass::closeTrackHandles()
+{
+	if (cdinfo.trackinfo)
+	{
+		for (int i = 0; i < cdinfo.numtracks; i++)
+		{
+			if (cdinfo.trackinfo[i].fp)
+			{
+				fclose(cdinfo.trackinfo[i].fp);
+				for (int j = i+1; j < cdinfo.numtracks; j++)
+				{
+					if (cdinfo.trackinfo[j].fp == cdinfo.trackinfo[i].fp)
+						cdinfo.trackinfo[j].fp = NULL;
+				}
+
+				cdinfo.trackinfo[i].fp = NULL;
+			}
+		}
+	}
+}
+
 int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *db)
 {
    char *p;
@@ -905,39 +1372,49 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
    unsigned long dirrecsize;
    char dlffilename[MAX_PATH];
    char dlfdir[MAX_PATH];
+	FILE *fp;
+   char header[6];
+	size_t num_read;
 
    memset(&cdinfo, 0, sizeof(cdinfo));
-	imageFp = NULL;
 
-   // Read cue file and figure out where bin file is
+	if (!(fp = fopen(filename, "rb")))
+		goto error;
+
+	num_read = fread((void *)header, 1, 6, fp);
+
    if ((p = strrchr((char *)filename, '.')) == NULL)
       goto error;
 
-   if (_stricmp(p, ".cue") == 0)
+   if (_stricmp(p, ".cue") == 0 && strncmp(header, "FILE \"", 6) == 0)
    {
+		// Read cue file and figure out where bin file is
       imageType = IT_BINCUE;
 
-      if (!parseCueFile(filename, &cdinfo))
+      if (!parseCueFile(filename, fp))
          goto error;
    }
+	else if (stricmp(p, ".MDS") == 0 && strncmp(header, "MEDIA ", sizeof(header)) == 0)
+	{
+		// It's a MDS
+		imageType = IT_MDS;
+		if (parseMDS(filename, fp) != 0)
+			goto error;
+	}
+	else if (stricmp(p, ".CCD") == 0)
+	{
+		// It's a CCD
+		imageType = IT_CCD;
+		if (parseCCD(filename, fp) != 0)
+		goto error;
+	}
    else if (_stricmp(p, ".iso") == 0)
    {
-      // Unsupported for now
+      // Unsupported
       goto error;
    }
    else
       goto error;
-
-   if ((imageFp = fopen(cdinfo.trackinfo[0].filename, "rb")) == NULL)
-   {
-      // try stripping off path and use the same path as cue file
-      char newFilename[MAX_PATH];
-
-      MakeCuePathFilename(cdinfo.trackinfo[0].filename, filename, newFilename);
-
-      if ((imageFp = fopen(newFilename, "rb")) == NULL)
-         goto error;
-   }
 
    char command[MAX_PATH*2];
    char path[MAX_PATH];
@@ -959,7 +1436,7 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
 	if (!loadCompleteRecordSet(&pvd, &dirrec, &dirrecsize))
 		goto error;
 
-   if (!createPaths(dir, ptr, numptr, dirrec, dirrecsize))
+	if (!createPaths(dir, ptr, numptr, dirrec, dirrecsize))
       goto error;
 
    // Read files into "Files" subdirectory, remember to double check that each file is properly linked to the correct start sector, etc.
@@ -972,7 +1449,7 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
    if (!extractCDDA(dirrec, dirrecsize, dir))
       goto error;
 
-   // Create database here and save it to the root of the output directory
+	// Create database here and save it to the root of the output directory
    if (!createDB(&pvd, dirrec, dirrecsize, db))
       goto error;
 
@@ -985,20 +1462,19 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
    GetCurrentDirectory(sizeof(dlfdir), dlfdir);
    db->setDLFDirectory(dlfdir);
 
+	closeTrackHandles();
    free(cdinfo.trackinfo);
    free(ptr);
    free(dirrec);
-   fclose(imageFp);
    return TRUE;
 error:
+	closeTrackHandles();
    if (cdinfo.trackinfo)
       free(cdinfo.trackinfo);
    if (ptr)
       free(ptr);
    if (dirrec)
       free(dirrec);
-   if (imageFp)
-     fclose(imageFp);
    return FALSE;
 }
 

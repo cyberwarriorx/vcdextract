@@ -1,4 +1,4 @@
-/*  Copyright 2013-2015 Theo Berkau
+/*  Copyright 2013-2016 Theo Berkau
 
     This file is part of VCDEXTRACT.
 

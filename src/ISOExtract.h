@@ -1,4 +1,4 @@
-/*  Copyright 2013-2015 Theo Berkau
+/*  Copyright 2013-2016 Theo Berkau
 
     This file is part of VCDEXTRACT.
 
@@ -21,6 +21,7 @@
 #define ISO_EXTRACT_H
 
 #include <windows.h>
+#include <stdint.h>
 #include "iso.h"
 #include "DBClass.h"
 
@@ -31,6 +32,87 @@ typedef struct
    int numtracks;
    trackinfo_struct *trackinfo;
 } cdinfo_struct;
+
+#pragma pack(push, 1)
+typedef struct
+{
+	uint8_t signature[16];
+	uint8_t version[2];
+	uint16_t medium_type;
+	uint16_t session_count;
+	uint16_t unused1[2];
+	uint16_t bca_length;
+	uint32_t unused2[2];
+	uint32_t bca_offset;
+	uint32_t unused3[6];
+	uint32_t disk_struct_offset;
+	uint32_t unused4[3];
+	uint32_t sessions_blocks_offset;
+	uint32_t dpm_blocks_offset;
+	uint32_t enc_key_offset;
+} mds_header_struct;
+
+typedef struct
+{
+	int32_t session_start;
+	int32_t session_end;
+	uint16_t session_number;
+	uint8_t totalBlocks;
+	uint8_t leadin_blocks;
+	uint16_t first_track;
+	uint16_t lastTrack;
+	uint32_t unused;
+	uint32_t trackBlocksOffset;
+} mds_session_struct;
+
+typedef struct
+{
+	uint8_t mode;
+	uint8_t subchannel_mode;
+	uint8_t addr_ctl;
+	uint8_t unused1;
+	uint8_t track_num;
+	uint32_t unused2;
+	uint8_t m;
+	uint8_t s;
+	uint8_t f;
+	uint32_t extra_offset;
+	uint16_t sector_size;
+	uint8_t unused3[18];
+	uint32_t start_sector;
+	uint64_t start_offset;
+	uint8_t session;
+	uint8_t unused4[3];
+	uint32_t footer_offset;
+	uint8_t unused5[24];
+} mds_track_struct;
+
+typedef struct
+{
+	uint32_t filename_offset;
+	uint32_t is_widechar;
+	uint32_t unused1;
+	uint32_t unused2;
+} mds_footer_struct;
+
+#pragma pack(pop)
+
+#define CCD_MAX_SECTION 20
+#define CCD_MAX_NAME 30
+#define CCD_MAX_VALUE 20
+
+typedef struct
+{
+	char section[CCD_MAX_SECTION];
+	char name[CCD_MAX_NAME];
+	char value[CCD_MAX_VALUE];
+} ccd_dict_struct;
+
+typedef struct
+{
+	ccd_dict_struct *dict;
+	int num_dict;
+} ccd_struct;
 
 class ISOExtractClass
 {
@@ -45,7 +127,9 @@ private:
 	enum IMAGETYPE
 	{
 		IT_BINCUE=0,
-		IT_ISO
+		IT_ISO,
+		IT_MDS,
+		IT_CCD
 	};
 
 	int time_sectors;
@@ -53,7 +137,6 @@ private:
 
 	ISOExtractClass::IMAGETYPE imageType;
 	ISOExtractClass::SORTTYPE sortType;
-	FILE *imageFp;
 	bool oldTime;
 	int extractIP(const char *dir);
 	void isoVarRead(void *var, unsigned char **buffer, size_t varsize);
@@ -67,17 +150,24 @@ private:
 	int createPaths(const char *dir, ptr_struct *ptr, int numptr, dirrec_struct *dirrec, unsigned long numdirrec);
 	int extractCDDA(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir);
 	int createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned long numdirrec, DBClass *db);
-   int parseCueFile(const char *filename, cdinfo_struct *cdinfo);
-   void MakeCuePathFilename(const char *filename, const char *cueFilename, char *outFilename);
+	int parseCueFile(const char *filename, FILE *fp);
+	enum tracktype getTrackType(uint64_t offset, FILE *fp);
+	int loadMDSTracks(const char *mds_filename, FILE *iso_file, mds_session_struct *mds_session);
+	int parseMDS(const char *mds_filename, FILE *iso_file);
+	int loadParseCCD(FILE *ccd_fp, ccd_struct *ccd);
+	int GetIntCCD(ccd_struct *ccd, char *section, char *name);
+	int parseCCD(const char *ccd_filename, FILE *iso_file);
+	void MakeCuePathFilename(const char *filename, const char *cueFilename, char *outFilename);
+	void closeTrackHandles();
 public:
    ISOExtractClass();
    ~ISOExtractClass();
 	void setMaintainOldTime(bool oldTime);
    int importDisc(const char *filename, const char *dir, DBClass *db);
-	int readRawSector(int offset, unsigned char *buffer, int *readsize);
-	trackinfo_struct *FADToTrack(int FAD);
+	int readRawSector(unsigned int FAD, unsigned char *buffer, int *readsize, trackinfo_struct *track=NULL);
+	trackinfo_struct *FADToTrack(unsigned int FAD);
 	int readUserSector(int offset, unsigned char *buffer, int *readsize, trackinfo_struct *track=NULL);
-	int readSectorSubheader(int offset, xa_subheader_struct *subheader);
+	int readSectorSubheader(unsigned int FAD, xa_subheader_struct *subheader, trackinfo_struct *track=NULL);
 	void setSortType(ISOExtractClass::SORTTYPE sortType);
 };
 
