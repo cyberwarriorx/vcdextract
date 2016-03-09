@@ -752,10 +752,10 @@ int ISOExtractClass::createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned l
 int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 {
    char text[MAX_PATH*2];
+	char fn[MAX_PATH];
    int tracknum=0, indexnum, min, sec, frame, pregap=0;
 
-   if (fscanf(fp, "FILE \"%*[^\"]\" %*s\r\n") == EOF)
-      goto error;
+	fseek(fp, 0, SEEK_SET);
 
    cdinfo.numtracks = 1;
    cdinfo.trackinfo = (trackinfo_struct *)malloc(100*sizeof(trackinfo_struct));
@@ -765,80 +765,114 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
    for (;;)
    {
       // Retrieve a line in cue
-      if (fscanf(fp, "%s", text) == EOF)
+      if (fscanf(fp, "%[^\n]\n", text) == EOF)
          break;
 
       // Figure out what it is
-      if (strncmp(text, "TRACK", 5) == 0)
-      {
-         // Handle accordingly
-         if (fscanf(fp, "%d %[^\r\n]\r\n", &tracknum, text) == EOF)
-            break;
+		if (strncmp(text, "CATALOG", 7) == 0)
+		{
+			sscanf(text, "CATALOG %s", cdinfo.catalogNo);
+		}
+		else if (strncmp(text, "CDTEXTFILE", 10) == 0)
+			printf("Warning: Unsupported cue tag 'CDTEXTFILE'\n");
+		else if (strncmp(text, "FLAGS", 5) == 0)
+			printf("Warning: Unsupported cue tag 'FLAGS'\n");
+		else if (strncmp(text, "FILE", 4) == 0)
+		{
+			// Go back, retrieve image filename
+			char type[512];
+			sscanf(text, "FILE \"%[^\"]\" %s\r\n", fn, type);   
 
-         if (tracknum > cdinfo.numtracks)
-         {
-            // Reallocate buffer
-            trackinfo_struct *trackinfo = (trackinfo_struct *)malloc((tracknum+1)*sizeof(trackinfo_struct));
-            if (trackinfo == NULL)
-               goto error;
-            memcpy(trackinfo, cdinfo.trackinfo, sizeof(trackinfo_struct)*cdinfo.numtracks);
-            free(cdinfo.trackinfo);
-            cdinfo.trackinfo = trackinfo;
-            cdinfo.numtracks = tracknum;
-         }
-         if (strncmp(text, "MODE1", 5) == 0 ||
-             strncmp(text, "MODE2", 5) == 0)
-         {
-            // Figure out the track sector size
-				cdinfo.trackinfo[tracknum-1].sectorsize = atoi(text + 6);
-            cdinfo.trackinfo[tracknum-1].type = (tracktype)(text[4]-'0');
-         }
-         else if (strncmp(text, "AUDIO", 5) == 0)
+			if (stricmp(type, "BINARY") != 0)
 			{
-				cdinfo.trackinfo[tracknum-1].sectorsize = 2352;
-            cdinfo.trackinfo[tracknum-1].type = TT_CDDA;
+				printf("Error: Unsupported cue 'FILE' type '%s'\n", type);
+				goto error;
 			}
-      }
-      else if (strncmp(text, "INDEX", 5) == 0)
-      {
-         // Handle accordingly
+		}
+		else if (strncmp(text, "INDEX", 5) == 0)
+		{
+			// Handle accordingly
 
-         if (fscanf(fp, "%d %d:%d:%d\r\n", &indexnum, &min, &sec, &frame) == EOF)
-            break;
+			if (sscanf(text, "INDEX %d %d:%d:%d\r\n", &indexnum, &min, &sec, &frame) != 4)
+				break;
 
-         if (indexnum == 1)
-         {
-            // Update toc entry
+			if (indexnum == 1)
+			{
+				// Update toc entry
 				cdinfo.trackinfo[tracknum-1].fadstart = (MSF_TO_FAD(min, sec, frame) + pregap + 150);
 				cdinfo.trackinfo[tracknum-1].fileoffset = MSF_TO_FAD(min, sec, frame) * cdinfo.trackinfo[tracknum-1].sectorsize;
-         }
-      }
+			}
+		}
+		else if (strncmp(text, "ISRC", 4) == 0)
+			printf("Warning: Unsupported cue tag 'ISRC'\n");
+		else if (strncmp(text, "PERFORMER", 9) == 0)
+		{
+			// Ignore line
+		}
       else if (strncmp(text, "PREGAP", 5) == 0)
       {
-         if (fscanf(fp, "%d:%d:%d\r\n", &min, &sec, &frame) == EOF)
+         if (sscanf(text, "PREGAP %d:%d:%d\r\n", &min, &sec, &frame) != 3)
             break;
 
          pregap += MSF_TO_FAD(min, sec, frame);
       }
       else if (strncmp(text, "POSTGAP", 5) == 0)
       {
-         if (fscanf(fp, "%d:%d:%d\r\n", &min, &sec, &frame) == EOF)
+         if (sscanf(text, "POSTGAP %d:%d:%d\r\n", &min, &sec, &frame) != 3)
             break;
       }
-		else if (strncmp(text, "FILE", 4) == 0)
+		else if (strncmp(text, "REM", 3) == 0)
 		{
-			printf("Unsupported cue format\n");
-			goto error;
+			// Comment, just ignore line
+			if (fscanf(fp, "%*[^\n]\n") == EOF)
+				break;
 		}
+		else if (strncmp(text, "SONGWRITER", 10) == 0)
+		{
+			// Ignore line
+		}
+		else if (strncmp(text, "TITLE", 5) == 0)
+		{
+			// Ignore line
+		}
+		else if (strncmp(text, "TRACK", 5) == 0)
+		{
+			char type[512];
+			// Handle accordingly
+			if (sscanf(text, "TRACK %d %[^\r\n]\r\n", &tracknum, type) != 2)
+				break;
 
+			if (tracknum > cdinfo.numtracks)
+			{
+				// Reallocate buffer
+				trackinfo_struct *trackinfo = (trackinfo_struct *)malloc((tracknum+1)*sizeof(trackinfo_struct));
+				if (trackinfo == NULL)
+					goto error;
+				memcpy(trackinfo, cdinfo.trackinfo, sizeof(trackinfo_struct)*cdinfo.numtracks);
+				free(cdinfo.trackinfo);
+				cdinfo.trackinfo = trackinfo;
+				cdinfo.numtracks = tracknum;
+			}
+
+			strcpy(cdinfo.trackinfo[tracknum-1].filename, fn);
+
+			if (strncmp(type, "MODE1", 5) == 0 ||
+				strncmp(type, "MODE2", 5) == 0)
+			{
+				// Figure out the track sector size
+				cdinfo.trackinfo[tracknum-1].sectorsize = atoi(type + 6);
+				cdinfo.trackinfo[tracknum-1].type = (tracktype)(type[4]-'0');
+			}
+			else if (strncmp(type, "AUDIO", 5) == 0)
+			{
+				cdinfo.trackinfo[tracknum-1].sectorsize = 2352;
+				cdinfo.trackinfo[tracknum-1].type = TT_CDDA;
+			}
+		}
    }
 
 	cdinfo.trackinfo[tracknum].fileoffset = 0;
 	cdinfo.trackinfo[tracknum].fadstart = 0xFFFFFFFF;
-
-	// Go back, retrieve image filename
-	fseek(fp, 0, SEEK_SET);
-	fscanf(fp, "FILE \"%[^\"]\" %*s\r\n", cdinfo.trackinfo[0].filename);   
 
 	FILE *imageFp;
 	// Now go and open up the image file, figure out its size, etc.
@@ -1386,7 +1420,7 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
    if ((p = strrchr((char *)filename, '.')) == NULL)
       goto error;
 
-   if (_stricmp(p, ".cue") == 0 && strncmp(header, "FILE \"", 6) == 0)
+   if (_stricmp(p, ".cue") == 0)
    {
 		// Read cue file and figure out where bin file is
       imageType = IT_BINCUE;

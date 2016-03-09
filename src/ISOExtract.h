@@ -29,6 +29,7 @@
 
 typedef struct
 {
+	char catalogNo[14];
    int numtracks;
    trackinfo_struct *trackinfo;
 } cdinfo_struct;
