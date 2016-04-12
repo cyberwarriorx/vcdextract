@@ -24,7 +24,8 @@
 
 void usage()
 {
-   printf("vcdextract v%s [--oldtime] [--extract=<output directory>] <filename/cdrom path>", VERSION);
+   printf("VCDEXTRACT v%s by Cyber Warrior X\n", VERSION);
+   printf("usage: vcdextract [--oldtime] [--detailedstatus] [--extract=<output directory>] <filename/cdrom path>");
 }
 
 int main( int argc, char** argv )
@@ -34,6 +35,7 @@ int main( int argc, char** argv )
    bool isDisc=false;
    bool extractFiles=false;
 	bool oldTime=false;
+	bool detailedStatus = false;
 	ISOExtractClass::SORTTYPE sortType = ISOExtractClass::SORT_BY_DIRREC;
 
    if (argc < 2)
@@ -51,6 +53,8 @@ int main( int argc, char** argv )
       }
 		else if (strncmp(argv[i], "--oldtime", strlen("--oldtime")) == 0)
 			oldTime = true;
+		else if (strncmp(argv[i], "--detailedstatus", strlen("--detailedstatus")) == 0)
+			detailedStatus = true;
 		else if (strncmp(argv[i], "--sortbylba", strlen("--sortbylba")) == 0)
 			sortType = ISOExtractClass::SORT_BY_LBA;
 		else
@@ -67,8 +71,8 @@ int main( int argc, char** argv )
 
    printf("Extracting disc %s to %s...\n", discPath, outPath);
 	iec.setMaintainOldTime(oldTime);
-
 	iec.setSortType(sortType);
+	iec.setDetailedStatus(detailedStatus);
 
    if (!iec.importDisc(discPath, outPath, &curdb))
    {

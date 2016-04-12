@@ -41,6 +41,11 @@ void ISOExtractClass::setMaintainOldTime(bool oldTime)
 	this->oldTime = oldTime;
 }
 
+void ISOExtractClass::setDetailedStatus(bool detailedStatus)
+{
+	this->detailedStatus = detailedStatus;
+}
+
 int ISOExtractClass::readRawSector(unsigned int FAD, unsigned char *buffer, int *readsize, trackinfo_struct *track)
 {
 	if (track == NULL)
@@ -552,10 +557,14 @@ int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec
             goto error;
          }
 
+		 if (!detailedStatus)
+			 printf("%s...", dirrec[i].FileIdentifier);
+
          for (unsigned long i2 = 0; i2 < dirrec[i].DataLengthL; i2+=2048)
          {
-				printf("\r%s:(%ld/%ld)", dirrec[i].FileIdentifier, i2/2048, dirrec[i].DataLengthL/2048);
-            if (!readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset + i2 / 2048, sector, &readsize, track))
+			 if (detailedStatus)
+				 printf("\r%s:(%ld/%ld)", dirrec[i].FileIdentifier, i2 / 2048, dirrec[i].DataLengthL / 2048);
+			 if (!readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset + i2 / 2048, sector, &readsize, track))
                goto error;
 
             if ((dirrec[i].DataLengthL-i2) < (DWORD)readsize)
@@ -572,7 +581,10 @@ int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec
             }
          }
 
-			printf("\r%s:(%ld/%ld)...done.\n", dirrec[i].FileIdentifier, dirrec[i].DataLengthL/2048, dirrec[i].DataLengthL/2048);
+		 if (detailedStatus)
+			 printf("\r%s:(%ld/%ld)...done.\n", dirrec[i].FileIdentifier, dirrec[i].DataLengthL / 2048, dirrec[i].DataLengthL / 2048);
+		 else
+			 printf("done.\n");
 
 			setPathSaveTime(hOutput, &dirrec[i]);
          CloseHandle(hOutput);
@@ -602,7 +614,10 @@ int ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, int numptr, d
    // Create Files and CDDA
    sprintf(path, "%s\\Files", dir);
    if (!CreateDirectory(path, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
-      goto error;
+   {
+	   printf("Error creating directory %s\n", path);
+	   goto error;
+}
 
 #if 0
 	if (oldTime)
@@ -614,7 +629,10 @@ int ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, int numptr, d
 
    sprintf(path, "%s\\CDDA", dir);
    if (!CreateDirectory(path, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
-      goto error;
+   {
+	   printf("Error creating directory %s\n", path);
+	   goto error;
+   }
 
    // Read Paths and Create
    for (i = 1; i < numptr; i++)
@@ -637,7 +655,10 @@ int ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, int numptr, d
          sprintf(path, "%s\\Files\\%s", dir, path2);
       }
       if (!CreateDirectory(path, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
-         goto error;
+	  {
+		  printf("Error creating directory %s\n", path);
+		  goto error;
+	  }
    }
 
    return TRUE;
@@ -660,15 +681,21 @@ int ISOExtractClass::extractCDDA(dirrec_struct *dirrec, unsigned long numdirrec,
          if (outfp)
          {            
             unsigned int num_sectors=((unsigned int)cdinfo.trackinfo[i].fadend-(unsigned int)cdinfo.trackinfo[i].fadstart);
-            for (unsigned int  j = 0; j < num_sectors; j++)
+			if (!detailedStatus)
+				printf("Track %d...", i + 1);
+			for (unsigned int  j = 0; j < num_sectors; j++)
             {
                int readsize=0;
-					printf("\rTrack %d:(%ld/%ld)", i+1, j, num_sectors);
-               if (readUserSector(cdinfo.trackinfo[i].fadstart + j - 150, sector, &readsize))
+			   if (detailedStatus)
+				   printf("\rTrack %d:(%ld/%ld)", i + 1, j, num_sectors);
+			   if (readUserSector(cdinfo.trackinfo[i].fadstart + j - 150, sector, &readsize))
                   fwrite(sector, 1, 2352, outfp);
             }
-				printf("\rTrack %d:(%ld/%ld)...done.\n", i+1, num_sectors, num_sectors);
-            fclose(outfp);
+			if (detailedStatus)
+				printf("\rTrack %d:(%ld/%ld)...done.\n", i + 1, num_sectors, num_sectors);
+			else
+				printf("done.\n");
+			fclose(outfp);
          }
       }
    }
@@ -758,7 +785,7 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 	fseek(fp, 0, SEEK_SET);
 
    cdinfo.numtracks = 1;
-   cdinfo.trackinfo = (trackinfo_struct *)malloc(100*sizeof(trackinfo_struct));
+   cdinfo.trackinfo = (trackinfo_struct *)calloc(100, sizeof(trackinfo_struct));
    if (!cdinfo.trackinfo)
       goto error;
 
@@ -887,6 +914,7 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 		{
 			cdinfo.trackinfo[tracknum].fileoffset = 0xFFFFFFFF;
 			cdinfo.trackinfo[tracknum].fadstart = 0xFFFFFFFF;
+			printf("Error opening binary file specified in cue file: %s\n", cdinfo.trackinfo[0].filename);
 			goto error;
 		}
 	}
@@ -909,7 +937,10 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 
 error:
    if (cdinfo.trackinfo)
-      free(cdinfo.trackinfo);
+   {
+	   free(cdinfo.trackinfo);
+	   cdinfo.trackinfo = NULL;
+   }
    if (fp)
       fclose(fp);
    return FALSE;
@@ -1425,8 +1456,8 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
 		// Read cue file and figure out where bin file is
       imageType = IT_BINCUE;
 
-      if (!parseCueFile(filename, fp))
-         goto error;
+	  if (!parseCueFile(filename, fp))
+		  goto error;
    }
 	else if (stricmp(p, ".MDS") == 0 && strncmp(header, "MEDIA ", sizeof(header)) == 0)
 	{

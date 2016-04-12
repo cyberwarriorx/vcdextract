@@ -139,6 +139,7 @@ private:
 	ISOExtractClass::IMAGETYPE imageType;
 	ISOExtractClass::SORTTYPE sortType;
 	bool oldTime;
+	bool detailedStatus;
 	int extractIP(const char *dir);
 	void isoVarRead(void *var, unsigned char **buffer, size_t varsize);
    int copyDirRecord(unsigned char *buffer, dirrec_struct *dirrec);
@@ -164,6 +165,7 @@ public:
    ISOExtractClass();
    ~ISOExtractClass();
 	void setMaintainOldTime(bool oldTime);
+	void setDetailedStatus(bool detailedStatus);
    int importDisc(const char *filename, const char *dir, DBClass *db);
 	int readRawSector(unsigned int FAD, unsigned char *buffer, int *readsize, trackinfo_struct *track=NULL);
 	trackinfo_struct *FADToTrack(unsigned int FAD);
