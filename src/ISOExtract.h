@@ -169,7 +169,7 @@ public:
    int importDisc(const char *filename, const char *dir, DBClass *db);
 	int readRawSector(unsigned int FAD, unsigned char *buffer, int *readsize, trackinfo_struct *track=NULL);
 	trackinfo_struct *FADToTrack(unsigned int FAD);
-	int readUserSector(int offset, unsigned char *buffer, int *readsize, trackinfo_struct *track=NULL);
+	int readUserSector(int offset, unsigned char *buffer, int *readsize, trackinfo_struct *track=NULL, sectorinfo_struct *sectorinfo=NULL);
 	int readSectorSubheader(unsigned int FAD, xa_subheader_struct *subheader, trackinfo_struct *track=NULL);
 	void setSortType(ISOExtractClass::SORTTYPE sortType);
 };

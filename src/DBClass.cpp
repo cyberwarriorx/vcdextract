@@ -190,11 +190,6 @@ void DBClass::doDirectoryMode2(FILE *fp, int dirIndex, int level)
 					fprintf(fp, "%s    RecordingDate %02d/%02d/%04d %02d:%02d:%02d:%02d:%02d\n", space, vdt.Day, vdt.Month, 1900+vdt.Year, vdt.Hour, vdt.Minute, vdt.Second, 0, vdt.Zone);
 				}
 
-				if (strcmp(filelist[i].getRealFilename(), "Files\\ADPCM\\DIR_COMM\\P010.XA") == 0)
-				{
-					printf("temp\n");
-				}
-
 				if ((flags & (FF_MPEG|FF_VIDEO|FF_AUDIO)) == (FF_MPEG|FF_VIDEO|FF_AUDIO))
 				{
 					char basefile[MAX_PATH];

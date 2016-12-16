@@ -59,6 +59,12 @@ typedef struct
    char filename[MAX_PATH];
 } trackinfo_struct;
 
+typedef struct
+{
+	tracktype type;
+	xa_subheader_struct subheader;
+} sectorinfo_struct;
+
 class DBClass
 {
 private:

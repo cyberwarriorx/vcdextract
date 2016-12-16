@@ -80,7 +80,7 @@ int main( int argc, char** argv )
       exit(1);
    }
 
-   printf("done.\n");
+   printf("Extraction finished.\n");
 
    exit(0);
 	return 0;

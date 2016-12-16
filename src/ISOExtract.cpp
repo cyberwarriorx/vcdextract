@@ -95,7 +95,7 @@ trackinfo_struct *ISOExtractClass::FADToTrack(unsigned int FAD)
 	return track;
 }
 
-int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *readsize, trackinfo_struct *track)
+int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *readsize, trackinfo_struct *track, sectorinfo_struct *sectorinfo)
 {
    int size;
    int mode;
@@ -103,6 +103,9 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 
 	if (track == NULL)
 		track = FADToTrack(FAD);
+
+	if (sectorinfo)
+		sectorinfo->type = track->type;
 
 	if (imageType != IT_ISO)
    {
@@ -124,14 +127,13 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
          else if (mode == 2)
          {
 				// Figure it out based on subheader
-				xa_subheader_struct subheader;
 
-				if ((fread(&subheader, sizeof(unsigned char), sizeof(xa_subheader_struct), track->fp)) != sizeof(xa_subheader_struct))
+				if ((fread(&sectorinfo->subheader, sizeof(unsigned char), sizeof(xa_subheader_struct), track->fp)) != sizeof(xa_subheader_struct))
 					return FALSE;
 
-            if (subheader.sm & XAFLAG_FORM2)
+            if (sectorinfo->subheader.sm & XAFLAG_FORM2)
 				{
-					if (subheader.sm & XAFLAG_AUDIO)
+					if (sectorinfo->subheader.sm & XAFLAG_AUDIO)
 						size = 2304; // We don't need the last 20 bytes
 					else
                   size = 2324;
@@ -503,10 +505,12 @@ void ISOExtractClass::setPathSaveTime(HANDLE hPath, dirrec_struct *dirrec)
 int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir)
 {
    DWORD i;
-   HANDLE hOutput=INVALID_HANDLE_VALUE;
+   HANDLE hOutput=INVALID_HANDLE_VALUE, hOutput2=INVALID_HANDLE_VALUE;
    char filename[MAX_PATH+2], filename2[MAX_PATH], filename3[MAX_PATH];
    unsigned char sector[2352];
    unsigned long bytes_written=0;
+	sectorinfo_struct sectorinfo, sectorinfo2;
+	bool mpegMultiplexDemux=false;
 
 	time_sectors = 0;
 
@@ -524,6 +528,16 @@ int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec
 			{
 				dirrec[i].XAAttributes.attributes = 0x4111;
 				continue;
+			}
+			else if (track->type == TT_MODE2 &&
+				      strstr((char *)dirrec[i].FileIdentifier, ".MPG") &&
+						readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset+0, sector, &readsize, track, &sectorinfo) &&
+						readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset+1, sector, &readsize, track, &sectorinfo2))
+			{
+				// Is it a muxed mpeg file?
+				if ((sectorinfo.subheader.sm & XAFLAG_VIDEO) && sectorinfo.subheader.ci == 0x0F &&
+					 (sectorinfo2.subheader.sm & XAFLAG_AUDIO) && sectorinfo2.subheader.ci == 0x7F)
+					mpegMultiplexDemux = true;			
 			}
 
          if (dirrec[i].ParentRecord != 0xFFFFFFFF)
@@ -549,6 +563,23 @@ int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec
          if (p)
             p[0] = '\0';
 
+			if (mpegMultiplexDemux)
+			{
+				p = strrchr(filename, '.');
+				p[0] = '\0';
+
+				strcpy(filename2, filename);
+				strcat(filename, ".M1V");
+				strcat(filename2, ".MP2");
+
+				if ((hOutput2 = CreateFile(filename2, GENERIC_WRITE, 0, NULL,
+					CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) == INVALID_HANDLE_VALUE)
+				{
+					SetLastError(ERROR_OPEN_FAILED);
+					goto error;
+				}
+			}
+
          // Treat as a regular mode 1 file
          if ((hOutput = CreateFile(filename, GENERIC_WRITE, 0, NULL,
                                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) == INVALID_HANDLE_VALUE)
@@ -557,27 +588,45 @@ int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec
             goto error;
          }
 
-		 if (!detailedStatus)
-			 printf("%s...", dirrec[i].FileIdentifier);
+		if (!detailedStatus)
+				printf("%s...", dirrec[i].FileIdentifier);
 
          for (unsigned long i2 = 0; i2 < dirrec[i].DataLengthL; i2+=2048)
          {
-			 if (detailedStatus)
-				 printf("\r%s:(%ld/%ld)", dirrec[i].FileIdentifier, i2 / 2048, dirrec[i].DataLengthL / 2048);
-			 if (!readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset + i2 / 2048, sector, &readsize, track))
-               goto error;
+			if (detailedStatus)
+				printf("\r%s:(%ld/%ld)", dirrec[i].FileIdentifier, i2 / 2048, dirrec[i].DataLengthL / 2048);
+			if (!readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset + i2 / 2048, sector, &readsize, track, &sectorinfo))
+				goto error;
 
-            if ((dirrec[i].DataLengthL-i2) < (DWORD)readsize)
+				HANDLE curOutput=INVALID_HANDLE_VALUE;
+
+				if (!mpegMultiplexDemux)
+					curOutput = hOutput;
+				else
+				{
+					if ((sectorinfo.subheader.sm & XAFLAG_VIDEO) && sectorinfo.subheader.ci == 0x0F)
+						curOutput = hOutput;
+					else if ((sectorinfo.subheader.sm & XAFLAG_AUDIO) && sectorinfo.subheader.ci == 0x7F)
+						curOutput = hOutput2;
+				}
+
+            if ((dirrec[i].DataLengthL-i2) < (DWORD)2048)
             {
-               if (WriteFile(hOutput, sector, (dirrec[i].DataLengthL-i2), &bytes_written, NULL) == FALSE ||
-                  bytes_written != (dirrec[i].DataLengthL-i2))
-                  goto error;
+					if (curOutput!=INVALID_HANDLE_VALUE)
+					{
+						if (WriteFile(curOutput, sector, (dirrec[i].DataLengthL-i2), &bytes_written, NULL) == FALSE ||
+							bytes_written != (dirrec[i].DataLengthL-i2))
+							goto error;
+					}
             }
             else
             {
-               if (WriteFile(hOutput, sector, readsize, &bytes_written, NULL) == FALSE ||
-                  bytes_written != readsize)
-                  goto error;
+					if (curOutput!=INVALID_HANDLE_VALUE)
+					{
+						if (WriteFile(curOutput, sector, readsize, &bytes_written, NULL) == FALSE ||
+							bytes_written != readsize)
+							goto error;
+					}
             }
          }
 
@@ -589,6 +638,11 @@ int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec
 			setPathSaveTime(hOutput, &dirrec[i]);
          CloseHandle(hOutput);
          hOutput = INVALID_HANDLE_VALUE;
+			if (mpegMultiplexDemux)
+			{
+				CloseHandle(hOutput2);
+				hOutput2 = INVALID_HANDLE_VALUE;
+			}
       }
       else
       {
@@ -599,8 +653,10 @@ int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec
    SetLastError(NO_ERROR);
    return TRUE;
 error:
-   if (hOutput == INVALID_HANDLE_VALUE)
+   if (hOutput != INVALID_HANDLE_VALUE)
       CloseHandle(hOutput);
+	if (hOutput2 != INVALID_HANDLE_VALUE)
+		CloseHandle(hOutput2);
    return FALSE;
 }
 
@@ -680,7 +736,7 @@ int ISOExtractClass::extractCDDA(dirrec_struct *dirrec, unsigned long numdirrec,
 
          if (outfp)
          {            
-            unsigned int num_sectors=((unsigned int)cdinfo.trackinfo[i].fadend-(unsigned int)cdinfo.trackinfo[i].fadstart);
+            unsigned int num_sectors=((unsigned int)cdinfo.trackinfo[i].fadend-(unsigned int)cdinfo.trackinfo[i].fadstart+1);
 			if (!detailedStatus)
 				printf("Track %d...", i + 1);
 			for (unsigned int  j = 0; j < num_sectors; j++)
