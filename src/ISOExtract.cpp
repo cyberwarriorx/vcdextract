@@ -968,10 +968,18 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 
 		if ((imageFp = fopen(newFilename, "rb")) == NULL)
 		{
-			cdinfo.trackinfo[tracknum].fileoffset = 0xFFFFFFFF;
-			cdinfo.trackinfo[tracknum].fadstart = 0xFFFFFFFF;
-			printf("Error opening binary file specified in cue file: %s\n", cdinfo.trackinfo[0].filename);
-			goto error;
+         // try using the same base filename and path as cue file
+         strcpy(newFilename, filename);
+         char *p = strrchr(newFilename, '.');
+         strcpy(p, ".BIN");
+
+         if ((imageFp = fopen(newFilename, "rb")) == NULL)
+         {
+            cdinfo.trackinfo[tracknum].fileoffset = 0xFFFFFFFF;
+            cdinfo.trackinfo[tracknum].fadstart = 0xFFFFFFFF;
+            printf("Error opening binary file specified in cue file: %s\n", cdinfo.trackinfo[0].filename);
+            goto error;
+         }
 		}
 	}
 

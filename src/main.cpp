@@ -44,6 +44,8 @@ int main( int argc, char** argv )
       exit(1);
    }
 
+   GetCurrentDirectory(sizeof(outPath)/sizeof(outPath[0]), outPath);
+
    for (int i = 1; i < argc; i++)
    {
       if (strncmp(argv[i], "--extract=", strlen("--extract=")) == 0)
