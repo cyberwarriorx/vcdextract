@@ -55,11 +55,11 @@ int ISOExtractClass::readRawSector(unsigned int FAD, unsigned char *buffer, int 
 	{
 		fseek(track->fp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
 		if ((readsize[0] = (int)fread(buffer, sizeof(unsigned char), 2352, track->fp)) != 2352)
-			return FALSE;
-		return TRUE;
+			return false;
+		return true;
 	}
 
-	return FALSE;
+	return false;
 }
 
 int ISOExtractClass::readSectorSubheader(unsigned int FAD, xa_subheader_struct *subheader, trackinfo_struct *track)
@@ -71,11 +71,11 @@ int ISOExtractClass::readSectorSubheader(unsigned int FAD, xa_subheader_struct *
 	{
 		fseek(track->fp, (track->fileoffset + (FAD-track->fadstart) * track->sectorsize) + 16, SEEK_SET); 
 		if ((fread(subheader, sizeof(unsigned char), sizeof(xa_subheader_struct), track->fp)) != sizeof(xa_subheader_struct))
-			return FALSE;
-		return TRUE;
+			return false;
+		return true;
 	}   
 
-	return FALSE;
+	return false;
 }
 
 trackinfo_struct *ISOExtractClass::FADToTrack(unsigned int FAD)
@@ -114,7 +114,7 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 
 		fseek(track->fp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
       if (fread((void *)sync, sizeof(unsigned char), 12, track->fp) != 12)
-         return FALSE;
+         return false;
 
       if (memcmp(sync, truesync, 12) == 0)
       {
@@ -129,7 +129,7 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 				// Figure it out based on subheader
 
 				if ((fread(&sectorinfo->subheader, sizeof(unsigned char), sizeof(xa_subheader_struct), track->fp)) != sizeof(xa_subheader_struct))
-					return FALSE;
+					return false;
 
             if (sectorinfo->subheader.sm & XAFLAG_FORM2)
 				{
@@ -144,7 +144,7 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
             fseek(track->fp, 4, SEEK_CUR);
          }
          else
-            return FALSE;
+            return false;
       }
       else
       {
@@ -160,8 +160,8 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
    }
 
    if ((readsize[0] = (int)fread(buffer, sizeof(unsigned char), size, track->fp)) != size)
-      return FALSE;
-   return TRUE;
+      return false;
+   return true;
 }
 
 int ISOExtractClass::extractIP(const char *dir)
@@ -186,11 +186,11 @@ int ISOExtractClass::extractIP(const char *dir)
    }
 
    fclose(outfp);
-   return TRUE;
+   return true;
 error:
    if (outfp)
       fclose(outfp);
-   return FALSE;
+   return false;
 }
 
 void ISOExtractClass::isoVarRead(void *var, unsigned char **buffer, size_t varsize)
@@ -1007,7 +1007,7 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 	cdinfo.trackinfo[tracknum-1].fadend = cdinfo.trackinfo[tracknum-1].fadstart+
 		                                    (st.st_size-cdinfo.trackinfo[tracknum-1].fileoffset)/cdinfo.trackinfo[tracknum-1].sectorsize;
 	fclose(fp);
-   return TRUE;
+   return true;
 
 error:
    if (cdinfo.trackinfo)
@@ -1017,7 +1017,7 @@ error:
    }
    if (fp)
       fclose(fp);
-   return FALSE;
+   return false;
 }
 
 enum tracktype ISOExtractClass::getTrackType(uint64_t offset, FILE *fp)
