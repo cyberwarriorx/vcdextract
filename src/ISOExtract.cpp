@@ -878,7 +878,7 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 			char type[512];
 			sscanf(text, "FILE \"%[^\"]\" %s\r\n", fn, type);   
 
-			if (stricmp(type, "BINARY") != 0)
+			if (strcasecmp(type, "BINARY") != 0)
 			{
 				printf("Error: Unsupported cue 'FILE' type '%s'\n", type);
 				goto error;
@@ -1332,8 +1332,8 @@ int ISOExtractClass::GetIntCCD(ccd_struct *ccd, char *section, char *name)
 	int i;
 	for (i = 0; i < ccd->num_dict; i++)
 	{
-		if (stricmp(ccd->dict[i].section, section) == 0 &&
-			stricmp(ccd->dict[i].name, name) == 0)
+		if (strcasecmp(ccd->dict[i].section, section) == 0 &&
+			strcasecmp(ccd->dict[i].name, name) == 0)
 			return strtol(ccd->dict[i].value, NULL, 0);
 	}
 
@@ -1526,7 +1526,7 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
    if ((p = strrchr((char *)filename, '.')) == NULL)
       goto error;
 
-   if (_stricmp(p, ".cue") == 0)
+   if (strcasecmp(p, ".cue") == 0)
    {
 		// Read cue file and figure out where bin file is
       imageType = IT_BINCUE;
@@ -1534,21 +1534,21 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
 	  if (!parseCueFile(filename, fp))
 		  goto error;
    }
-	else if (stricmp(p, ".MDS") == 0 && strncmp(header, "MEDIA ", sizeof(header)) == 0)
+	else if (strcasecmp(p, ".MDS") == 0 && strncmp(header, "MEDIA ", sizeof(header)) == 0)
 	{
 		// It's a MDS
 		imageType = IT_MDS;
 		if (parseMDS(filename, fp) != 0)
 			goto error;
 	}
-	else if (stricmp(p, ".CCD") == 0)
+	else if (strcasecmp(p, ".CCD") == 0)
 	{
 		// It's a CCD
 		imageType = IT_CCD;
 		if (parseCCD(filename, fp) != 0)
 		goto error;
 	}
-   else if (_stricmp(p, ".iso") == 0)
+   else if (strcasecmp(p, ".iso") == 0)
    {
       // Unsupported
       goto error;
