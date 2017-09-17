@@ -30,6 +30,7 @@
 # define mkdir(file) mkdir(file, 0755)
 #else
 # include <direct.h>
+# define stat _stat
 # define WINDOWS_BUILD 1
 #endif
 
@@ -1002,8 +1003,8 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 		}
 	}
 
-	struct _stat st;
-	_stat(cdinfo.trackinfo[0].filename, &st);
+	struct stat st;
+	stat(cdinfo.trackinfo[0].filename, &st);
 
 	for (int i = 0; i < tracknum; i++)
 	{
