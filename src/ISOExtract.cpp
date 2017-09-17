@@ -26,6 +26,12 @@
 #include "ISOExtract.h"
 #include "iso.h"
 
+#ifndef _MSC_VER
+# define mkdir(file) mkdir(file, 0755)
+#else
+# include <direct.h>
+#endif
+
 extern DBClass curdb;
 
 ISOExtractClass::ISOExtractClass()
