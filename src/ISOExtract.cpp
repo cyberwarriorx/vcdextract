@@ -17,14 +17,11 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-#include <shlobj.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <io.h>
 #include <sys/stat.h>
-#include <sys/utime.h>
+#include <utime.h>
 #include <time.h>
-#include <direct.h>
 #include <errno.h>
 #include "ISOExtract.h"
 #include "iso.h"
