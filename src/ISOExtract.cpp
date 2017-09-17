@@ -518,13 +518,11 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned lon
    unsigned char sector[2352];
    unsigned long bytes_written=0;
 	sectorinfo_struct sectorinfo, sectorinfo2;
-	bool mpegMultiplexDemux=false;
    enum errorcode err = ERR_NONE;
-
-	time_sectors = 0;
 
    for (i = 0; i < numdirrec; i++)
    {
+      bool mpegMultiplexDemux=false;
       if (!(dirrec[i].FileFlags & ISOATTR_DIRECTORY))
       {
          char *p;

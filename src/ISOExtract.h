@@ -132,7 +132,6 @@ private:
 		IT_CCD
 	};
 
-	int time_sectors;
 	cdinfo_struct cdinfo;
 
 	ISOExtractClass::IMAGETYPE imageType;
