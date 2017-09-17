@@ -189,7 +189,7 @@ void DBClass::doDirectoryMode2(FILE *fp, int dirIndex, int level)
 				if ((flags & (FF_MPEG|FF_VIDEO|FF_AUDIO)) == (FF_MPEG|FF_VIDEO|FF_AUDIO))
 				{
 					char basefile[PATH_MAX];
-					strcpy(basefile, filelist[i].getFilename());
+					strcpy(basefile, filelist[i].getRealFilename());
 					char *p=strchr(basefile, '.');
 					if (p != NULL) 
 						p[0]='\0';;
