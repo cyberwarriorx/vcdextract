@@ -27,9 +27,11 @@
 #include "iso.h"
 
 #ifndef _MSC_VER
+# include <unistd.h>
 # define mkdir(file) mkdir(file, 0755)
 #else
 # include <direct.h>
+# define getcwd _getcwd
 # define stat _stat
 # define realpath(file_name, resolved_name) _fullpath(resolved_name, file_name, sizeof(resolved_name))
 # define WINDOWS_BUILD 1
@@ -1616,7 +1618,7 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
       goto error;
 	printf("..done\n");
 
-   GetCurrentDirectory(sizeof(dlfdir), dlfdir);
+   getcwd(dlfdir, sizeof(dlfdir));
    db->setDLFDirectory(dlfdir);
 
 	closeTrackHandles();
