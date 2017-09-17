@@ -515,7 +515,7 @@ void ISOExtractClass::setPathSaveTime(char *path, dirrec_struct *dirrec)
 
 enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir)
 {
-   DWORD i;
+   unsigned long i;
    FILE *fp, *fp2;
    char filename[PATH_MAX+2], filename2[PATH_MAX], filename3[PATH_MAX];
    unsigned char sector[2352];
@@ -621,7 +621,7 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned lon
 						curOutput = fp2;
 				}
 
-            if ((dirrec[i].DataLengthL-i2) < (DWORD)2048)
+            if ((dirrec[i].DataLengthL-i2) < (unsigned long)2048)
             {
 					if (curOutput != NULL)
 					{
