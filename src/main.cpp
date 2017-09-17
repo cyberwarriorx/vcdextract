@@ -18,10 +18,11 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
-#elif
+#else
 #include <unistd.h>
 #endif
 #include "ISOExtract.h"
