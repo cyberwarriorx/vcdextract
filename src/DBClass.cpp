@@ -202,10 +202,10 @@ void DBClass::doDirectoryMode2(FILE *fp, int dirIndex, int level)
 					fprintf(fp, "%s    MpegMultiplex\n", space);
 					fprintf(fp, "%s        MpegStream \"%s.M1V\" VIDEO\n", space, basefile);
 					fprintf(fp, "%s            BitRate %d.0\n", space, 1150000);
-					fprintf(fp, "%s        EndMpegStream", space);
+					fprintf(fp, "%s        EndMpegStream\n", space);
 					fprintf(fp, "%s        MpegStream \"%s.MP2\" AUDIO\n", space, basefile);
 					fprintf(fp, "%s            BitRate %d.0\n", space, 192000);
-					fprintf(fp, "%s        EndMpegStream", space);
+					fprintf(fp, "%s        EndMpegStream\n", space);
 					fprintf(fp, "%s    EndMpegMultiplex\n", space);
 				}
 				else
