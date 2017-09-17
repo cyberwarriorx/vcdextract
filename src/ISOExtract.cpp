@@ -31,6 +31,7 @@
 #else
 # include <direct.h>
 # define stat _stat
+# define realpath(file_name, resolved_name) _fullpath(resolved_name, file_name, sizeof(resolved_name))
 # define WINDOWS_BUILD 1
 #endif
 
@@ -1573,7 +1574,8 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
 
    char command[PATH_MAX*2];
    char path[PATH_MAX];
-   sprintf(command, "mkdir %s", _fullpath(path, dir, sizeof(path)));
+   realpath(dir, path);
+   sprintf(command, "mkdir %s", path);
    system(command); 
 
    if (!extractIP(dir))
