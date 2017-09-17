@@ -19,8 +19,12 @@
 
 #pragma once
 
-#include <windows.h>
 #include <stdio.h>
+#ifdef _WIN32
+#define PATH_MAX            260
+#else
+#include <limits.h>
+#endif
 #include "iso.h"
 
 #define FF_CDDA			(1 << 8)
@@ -45,7 +49,7 @@ public:
 
 private:
    char filename[32];
-   char real_filename[MAX_PATH];
+   char real_filename[PATH_MAX];
    unsigned long lba;
    unsigned long size;
    int flags;

@@ -19,11 +19,14 @@
 
 #include <shlobj.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <io.h>
 #include <sys/stat.h>
-#include <assert.h>
+#include <sys/utime.h>
+#include <time.h>
+#include <direct.h>
+#include <errno.h>
 #include "ISOExtract.h"
-//#include "ui_helper.h"
 #include "iso.h"
 
 extern DBClass curdb;
@@ -167,7 +170,7 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 int ISOExtractClass::extractIP(const char *dir)
 {
    unsigned char sector[2048];
-   char outfilename[MAX_PATH];
+   char outfilename[PATH_MAX];
    FILE *outfp;
    int i;
 
@@ -249,14 +252,14 @@ int ISOExtractClass::copyDirRecord(unsigned char *buffer, dirrec_struct *dirrec)
    return (int)(buffer - temp_pointer);
 }
 
-int ISOExtractClass::readPVD(pvd_struct *pvd)
+enum errorcode ISOExtractClass::readPVD(pvd_struct *pvd)
 {
    int readsize;
    unsigned char sector[2048];
    unsigned char *buffer;
 
    if (!readUserSector(16, sector, &readsize))
-      return FALSE;
+      return ERR_READ;
 
    buffer=sector;
 
@@ -304,11 +307,10 @@ int ISOExtractClass::readPVD(pvd_struct *pvd)
    isoVarRead(&pvd->ApplicationUse, &buffer, sizeof(pvd->ApplicationUse));
    isoVarRead(&pvd->ReservedForFutureStandardization2, &buffer, sizeof(pvd->ReservedForFutureStandardization2));
 
-   SetLastError(NO_ERROR);
-   return TRUE;
+   return ERR_NONE;
 }
 
-int ISOExtractClass::readPathTable(pvd_struct *pvd, ptr_struct **ptr, int *numptr)
+enum errorcode ISOExtractClass::readPathTable(pvd_struct *pvd, ptr_struct **ptr, int *numptr)
 {
    int i,j=0;
    int num_entries=0;
@@ -317,9 +319,13 @@ int ISOExtractClass::readPathTable(pvd_struct *pvd, ptr_struct **ptr, int *numpt
    ptr_struct *tempptr;
    int maxptr = 10;
    unsigned char *buffer;
+   enum errorcode err=ERR_NONE;
 
    if ((tempptr = (ptr_struct *)malloc(sizeof(ptr_struct) * maxptr)) == NULL)
+   {
+      err = ERR_ALLOC;
       goto error;
+   }
 
    // Read in Path Table
    ptrsize = (pvd->PathTableSizeL / 2048)+(pvd->PathTableSizeL % 2048 ? 1 : 0);
@@ -331,7 +337,10 @@ int ISOExtractClass::readPathTable(pvd_struct *pvd, ptr_struct **ptr, int *numpt
       int readsize;
 
       if (!readUserSector(pvd->LocationOfTypeLPathTable+i, sector, &readsize))
+      {
+         err = ERR_READ;
          goto error;
+      }
 
       buffer = sector;
 
@@ -371,15 +380,14 @@ int ISOExtractClass::readPathTable(pvd_struct *pvd, ptr_struct **ptr, int *numpt
 
    ptr[0] = tempptr;
    numptr[0] = num_entries;
-   SetLastError(NO_ERROR);
-   return TRUE;
+   return ERR_NONE;
 error:
    if (tempptr)
       free(tempptr);
-   return FALSE;
+   return err;
 }
 
-int ISOExtractClass::readDirRecords(unsigned long lba, unsigned long dirrecsize, dirrec_struct **dirrec, unsigned long *numdirrec, unsigned long parent)
+enum errorcode ISOExtractClass::readDirRecords(unsigned long lba, unsigned long dirrecsize, dirrec_struct **dirrec, unsigned long *numdirrec, unsigned long parent)
 {
    unsigned char *buffer;
    unsigned long counter=0;
@@ -389,6 +397,7 @@ int ISOExtractClass::readDirRecords(unsigned long lba, unsigned long dirrecsize,
    dirrec_struct *tempdirrec;
    unsigned long maxdirrec;
    unsigned long i;
+   enum errorcode err=ERR_NONE;
 
    if (parent == 0xFFFFFFFF)
    {
@@ -407,7 +416,10 @@ int ISOExtractClass::readDirRecords(unsigned long lba, unsigned long dirrecsize,
    for (i = 0; i < (dirrecsize / 2048); i++)
    {
       if (!readUserSector(lba+i, sector, &readsize))
+      {
+         err = ERR_READ;
          goto error;
+      }
 
       buffer = sector;
 
@@ -423,7 +435,10 @@ int ISOExtractClass::readDirRecords(unsigned long lba, unsigned long dirrecsize,
          {
             dirrec_struct *temp;
             if ((temp = (dirrec_struct *)malloc((maxdirrec*2) * sizeof(dirrec_struct))) == NULL)
+            {
+               err = ERR_ALLOC;
                goto error;
+            }
             memcpy(temp, tempdirrec, sizeof(dirrec_struct) * maxdirrec);
             free(tempdirrec);
             tempdirrec = temp;
@@ -438,24 +453,24 @@ int ISOExtractClass::readDirRecords(unsigned long lba, unsigned long dirrecsize,
 
    dirrec[0] = tempdirrec;
    numdirrec[0] = num_entries;
-   SetLastError(NO_ERROR);
-   return TRUE;
+   return err;
 error:
    if (tempdirrec)
       free(tempdirrec);
-   return FALSE;
+   return err;
 }
 
-int ISOExtractClass::loadCompleteRecordSet(pvd_struct *pvd, dirrec_struct **dirrec, unsigned long *numdirrec)
+enum errorcode ISOExtractClass::loadCompleteRecordSet(pvd_struct *pvd, dirrec_struct **dirrec, unsigned long *numdirrec)
 {
    unsigned long i;
+   enum errorcode err=ERR_NONE;
 
    // Load in the root directory 
-   if (!readDirRecords(pvd->DirectoryRecordForRootDirectory.LocationOfExtentL, 
+   if ((err = readDirRecords(pvd->DirectoryRecordForRootDirectory.LocationOfExtentL, 
                          pvd->DirectoryRecordForRootDirectory.DataLengthL,
-                         dirrec, numdirrec, 0xFFFFFFFF))
+                         dirrec, numdirrec, 0xFFFFFFFF)) != ERR_NONE)
    {
-      return FALSE;
+      return err;
    }
 
    // Now then, let's go through and handle the sub directories
@@ -465,52 +480,46 @@ int ISOExtractClass::loadCompleteRecordSet(pvd_struct *pvd, dirrec_struct **dirr
           dirrec[0][i].FileIdentifier[0] != '\0' &&
           dirrec[0][i].FileIdentifier[0] != 0x01)
       {         
-         if (!readDirRecords(dirrec[0][i].LocationOfExtentL, 
+         if ((err = readDirRecords(dirrec[0][i].LocationOfExtentL, 
                                dirrec[0][i].DataLengthL,
-                               dirrec, numdirrec, i))
-            goto error;
+                               dirrec, numdirrec, i)) != ERR_NONE)
+            return err;
       }
    }
 
-   SetLastError(NO_ERROR);
-   return TRUE;
-error:
-   return FALSE;
+   return err;
 }
 
-void ISOExtractClass::setPathSaveTime(HANDLE hPath, dirrec_struct *dirrec)
+void ISOExtractClass::setPathSaveTime(char *path, dirrec_struct *dirrec)
 {
-	SYSTEMTIME stSaveTime;
-	FILETIME ftSaveTime;
-	TIME_ZONE_INFORMATION tzi;
-	SYSTEMTIME stUTCSaveTime;
-
 	// Set the file time
-	stSaveTime.wYear = (WORD)(1900 + dirrec->RecordingDateAndTime.Year);
-	stSaveTime.wMonth = (WORD)dirrec->RecordingDateAndTime.Month;
-	stSaveTime.wDayOfWeek = 0;
-	stSaveTime.wDay = (WORD)dirrec->RecordingDateAndTime.Day;
-	stSaveTime.wHour = (WORD)dirrec->RecordingDateAndTime.Hour; // need to compensate for gmt
-	stSaveTime.wMinute = (WORD)dirrec->RecordingDateAndTime.Minute;
-	stSaveTime.wSecond = (WORD)dirrec->RecordingDateAndTime.Second;
-	stSaveTime.wMilliseconds = 0;
+   struct tm time;
+   time.tm_sec = dirrec->RecordingDateAndTime.Second;
+   time.tm_min = dirrec->RecordingDateAndTime.Minute;
+   time.tm_hour = dirrec->RecordingDateAndTime.Hour; // need to compensate for gmt
+   time.tm_mday = dirrec->RecordingDateAndTime.Day;
+   time.tm_mon = dirrec->RecordingDateAndTime.Month;
+   time.tm_year = dirrec->RecordingDateAndTime.Year;
+   time.tm_wday = 0;
+   time.tm_yday = 0;
+   time.tm_isdst = 0;
 
-	GetTimeZoneInformation(&tzi);
-	tzi.Bias = 240;
-	TzSpecificLocalTimeToSystemTime(&tzi, &stSaveTime, &stUTCSaveTime);
-	SystemTimeToFileTime(&stUTCSaveTime, &ftSaveTime);
-	SetFileTime(hPath, &ftSaveTime, &ftSaveTime, &ftSaveTime);
+   struct utimbuf tb;
+   tb.modtime = mktime(&time);
+   tb.actime = tb.modtime;
+   utime(path, &tb);
 }
 
-int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir)
+enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir)
 {
    DWORD i;
-   HANDLE hOutput=INVALID_HANDLE_VALUE, hOutput2=INVALID_HANDLE_VALUE;
-   char filename[MAX_PATH+2], filename2[MAX_PATH], filename3[MAX_PATH];
+   FILE *fp, *fp2;
+   char filename[PATH_MAX+2], filename2[PATH_MAX], filename3[PATH_MAX];
    unsigned char sector[2352];
    unsigned long bytes_written=0;
 	sectorinfo_struct sectorinfo, sectorinfo2;
 	bool mpegMultiplexDemux=false;
+   enum errorcode err = ERR_NONE;
 
 	time_sectors = 0;
 
@@ -572,19 +581,17 @@ int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec
 				strcat(filename, ".M1V");
 				strcat(filename2, ".MP2");
 
-				if ((hOutput2 = CreateFile(filename2, GENERIC_WRITE, 0, NULL,
-					CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) == INVALID_HANDLE_VALUE)
+				if ((fp2 = fopen(filename2, "wb")) == NULL)
 				{
-					SetLastError(ERROR_OPEN_FAILED);
+               err = ERR_OPENWRITE;
 					goto error;
 				}
 			}
 
          // Treat as a regular mode 1 file
-         if ((hOutput = CreateFile(filename, GENERIC_WRITE, 0, NULL,
-                                   CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)) == INVALID_HANDLE_VALUE)
+         if ((fp = fopen(filename, "wb")) == NULL)
          {
-            SetLastError(ERROR_OPEN_FAILED);
+            err = ERR_OPENWRITE;
             goto error;
          }
 
@@ -596,53 +603,62 @@ int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec
 			if (detailedStatus)
 				printf("\r%s:(%ld/%ld)", dirrec[i].FileIdentifier, i2 / 2048, dirrec[i].DataLengthL / 2048);
 			if (!readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset + i2 / 2048, sector, &readsize, track, &sectorinfo))
+         {
+            err = ERR_READ;
 				goto error;
+         }
 
-				HANDLE curOutput=INVALID_HANDLE_VALUE;
+				FILE *curOutput=NULL;
 
 				if (!mpegMultiplexDemux)
-					curOutput = hOutput;
+					curOutput = fp;
 				else
 				{
 					if ((sectorinfo.subheader.sm & XAFLAG_VIDEO) && sectorinfo.subheader.ci == 0x0F)
-						curOutput = hOutput;
+						curOutput = fp;
 					else if ((sectorinfo.subheader.sm & XAFLAG_AUDIO) && sectorinfo.subheader.ci == 0x7F)
-						curOutput = hOutput2;
+						curOutput = fp2;
 				}
 
             if ((dirrec[i].DataLengthL-i2) < (DWORD)2048)
             {
-					if (curOutput!=INVALID_HANDLE_VALUE)
+					if (curOutput != NULL)
 					{
-						if (WriteFile(curOutput, sector, (dirrec[i].DataLengthL-i2), &bytes_written, NULL) == FALSE ||
-							bytes_written != (dirrec[i].DataLengthL-i2))
+                  fwrite(sector, 1, (dirrec[i].DataLengthL-i2), curOutput);
+                  if (ferror(curOutput))
+                  {
+                     err = ERR_WRITE;
 							goto error;
+                  }
 					}
             }
             else
             {
-					if (curOutput!=INVALID_HANDLE_VALUE)
+					if (curOutput != NULL)
 					{
-						if (WriteFile(curOutput, sector, readsize, &bytes_written, NULL) == FALSE ||
-							bytes_written != readsize)
+                  fwrite(sector, 1, readsize, curOutput);
+                  if (ferror(curOutput))
+                  {
+                     err = ERR_WRITE;
 							goto error;
+                  }
 					}
             }
          }
 
-		 if (detailedStatus)
-			 printf("\r%s:(%ld/%ld)...done.\n", dirrec[i].FileIdentifier, dirrec[i].DataLengthL / 2048, dirrec[i].DataLengthL / 2048);
-		 else
-			 printf("done.\n");
+         if (detailedStatus)
+            printf("\r%s:(%ld/%ld)...done.\n", dirrec[i].FileIdentifier, dirrec[i].DataLengthL / 2048, dirrec[i].DataLengthL / 2048);
+         else
+            printf("done.\n");
 
-			setPathSaveTime(hOutput, &dirrec[i]);
-         CloseHandle(hOutput);
-         hOutput = INVALID_HANDLE_VALUE;
-			if (mpegMultiplexDemux)
-			{
-				CloseHandle(hOutput2);
-				hOutput2 = INVALID_HANDLE_VALUE;
-			}
+         fclose(fp);
+         setPathSaveTime(filename, &dirrec[i]);
+         fp = NULL;
+         if (mpegMultiplexDemux)
+         {
+            fclose(fp2);
+            fp2 = NULL;
+         }
       }
       else
       {
@@ -650,44 +666,45 @@ int ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec
       }
    }
 
-   SetLastError(NO_ERROR);
-   return TRUE;
+   return err;
 error:
-   if (hOutput != INVALID_HANDLE_VALUE)
-      CloseHandle(hOutput);
-	if (hOutput2 != INVALID_HANDLE_VALUE)
-		CloseHandle(hOutput2);
-   return FALSE;
+   if (fp != NULL)
+      fclose(fp);
+	if (fp2 != NULL)
+      fclose(fp2);
+   return err;
 }
 
-int ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, int numptr, dirrec_struct *dirrec, unsigned long numdirrec)
+enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, int numptr, dirrec_struct *dirrec, unsigned long numdirrec)
 {
-   char path[MAX_PATH];
-   char path2[MAX_PATH];
-   char path3[MAX_PATH];
+   char path[PATH_MAX];
+   char path2[PATH_MAX];
+   char path3[PATH_MAX];
    int i;
 
    // Create Files and CDDA
    sprintf(path, "%s\\Files", dir);
-   if (!CreateDirectory(path, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+   
+   if (mkdir(path) != 0 && errno != EEXIST)
    {
 	   printf("Error creating directory %s\n", path);
-	   goto error;
-}
+      return ERR_CREATEDIR;
+   }
 
 #if 0
 	if (oldTime)
 	{
-		HANDLE hDir = CreateFile(path, FILE_WRITE_ATTRIBUTES, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		?HANDLE hDir = CreateFile(path, FILE_WRITE_ATTRIBUTES, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		setPathSaveTime(hDir, &dirrec[0]);
 	}
 #endif
 
    sprintf(path, "%s\\CDDA", dir);
-   if (!CreateDirectory(path, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+
+   if (mkdir(path) != 0 && errno != EEXIST)
    {
 	   printf("Error creating directory %s\n", path);
-	   goto error;
+      return ERR_CREATEDIR;
    }
 
    // Read Paths and Create
@@ -710,25 +727,24 @@ int ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, int numptr, d
          }
          sprintf(path, "%s\\Files\\%s", dir, path2);
       }
-      if (!CreateDirectory(path, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
-	  {
-		  printf("Error creating directory %s\n", path);
-		  goto error;
-	  }
+      
+      if (mkdir(path) != 0 && errno != EEXIST)
+      {
+         printf("Error creating directory %s\n", path);
+         return ERR_CREATEDIR;
+      }
    }
 
-   return TRUE;
-error:
-   return FALSE;
+   return ERR_NONE;
 }
 
-int ISOExtractClass::extractCDDA(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir)
+enum errorcode ISOExtractClass::extractCDDA(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir)
 {
    for (int i = 0; i < cdinfo.numtracks; i++)
    {
       if (cdinfo.trackinfo[i].type  == TT_CDDA)
       {
-         char filename[MAX_PATH];
+         char filename[PATH_MAX];
          unsigned char sector[2352];
 
          sprintf(filename, "%s\\CDDA\\track%02d.bin", dir, i+1);
@@ -737,29 +753,31 @@ int ISOExtractClass::extractCDDA(dirrec_struct *dirrec, unsigned long numdirrec,
          if (outfp)
          {            
             unsigned int num_sectors=((unsigned int)cdinfo.trackinfo[i].fadend-(unsigned int)cdinfo.trackinfo[i].fadstart+1);
-			if (!detailedStatus)
-				printf("Track %d...", i + 1);
-			for (unsigned int  j = 0; j < num_sectors; j++)
+            if (!detailedStatus)
+               printf("Track %d...", i + 1);
+            for (unsigned int  j = 0; j < num_sectors; j++)
             {
                int readsize=0;
-			   if (detailedStatus)
-				   printf("\rTrack %d:(%ld/%ld)", i + 1, j, num_sectors);
-			   if (readUserSector(cdinfo.trackinfo[i].fadstart + j - 150, sector, &readsize))
+               if (detailedStatus)
+                  printf("\rTrack %d:(%ld/%ld)", i + 1, j, num_sectors);
+               if (readUserSector(cdinfo.trackinfo[i].fadstart + j - 150, sector, &readsize))
                   fwrite(sector, 1, 2352, outfp);
             }
-			if (detailedStatus)
-				printf("\rTrack %d:(%ld/%ld)...done.\n", i + 1, num_sectors, num_sectors);
-			else
-				printf("done.\n");
-			fclose(outfp);
+            if (detailedStatus)
+               printf("\rTrack %d:(%ld/%ld)...done.\n", i + 1, num_sectors, num_sectors);
+            else
+               printf("done.\n");
+            fclose(outfp);
          }
+         else
+            return ERR_OPENWRITE;
       }
    }
-	printf("\n");
-   return TRUE;
+   printf("\n");
+   return ERR_NONE;
 }
 
-int ISOExtractClass::createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned long numdirrec, DBClass *db)
+void ISOExtractClass::createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned long numdirrec, DBClass *db)
 {
    unsigned long i, j, k=0;
    unsigned long counter=0;
@@ -828,14 +846,12 @@ int ISOExtractClass::createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned l
 
    for (int i = 0; i < cdinfo.numtracks; i++)
       db->addTrack(&cdinfo.trackinfo[i], i);
-
-   return TRUE;
 }
 
 int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 {
-   char text[MAX_PATH*2];
-	char fn[MAX_PATH];
+   char text[PATH_MAX*2];
+	char fn[PATH_MAX];
    int tracknum=0, indexnum, min, sec, frame, pregap=0;
 
 	fseek(fp, 0, SEEK_SET);
@@ -962,7 +978,7 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 	if ((imageFp = fopen(cdinfo.trackinfo[0].filename, "rb")) == NULL)
 	{
 		// try stripping off path and use the same path as cue file
-		char newFilename[MAX_PATH];
+		char newFilename[PATH_MAX];
 
 		MakeCuePathFilename(cdinfo.trackinfo[0].filename, filename, newFilename);
 
@@ -995,8 +1011,6 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 	cdinfo.trackinfo[tracknum-1].fadend = cdinfo.trackinfo[tracknum-1].fadstart+
 		                                    (st.st_size-cdinfo.trackinfo[tracknum-1].fileoffset)/cdinfo.trackinfo[tracknum-1].sectorsize;
 	fclose(fp);
-
-
    return TRUE;
 
 error:
@@ -1447,7 +1461,7 @@ int ISOExtractClass::parseCCD(const char *ccd_filename, FILE *iso_file)
 void ISOExtractClass::MakeCuePathFilename(const char *filename, const char *cueFilename, char *outFilename)
 {
    // try stripping off path and use the same path as cue file
-   char file[MAX_PATH];
+   char file[PATH_MAX];
    char *p = strrchr ((char *)filename, '/');
    char *p2 = strrchr ((char *)filename, '\\');
 
@@ -1491,7 +1505,7 @@ void ISOExtractClass::closeTrackHandles()
 	}
 }
 
-int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *db)
+enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *db)
 {
    char *p;
    pvd_struct pvd;
@@ -1499,11 +1513,12 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
    int numptr;
    dirrec_struct *dirrec=NULL;
    unsigned long dirrecsize;
-   char dlffilename[MAX_PATH];
-   char dlfdir[MAX_PATH];
+   char dlffilename[PATH_MAX];
+   char dlfdir[PATH_MAX];
 	FILE *fp;
    char header[6];
 	size_t num_read;
+   enum errorcode err=ERR_NONE;
 
    memset(&cdinfo, 0, sizeof(cdinfo));
 
@@ -1545,8 +1560,8 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
    else
       goto error;
 
-   char command[MAX_PATH*2];
-   char path[MAX_PATH];
+   char command[PATH_MAX*2];
+   char path[PATH_MAX];
    sprintf(command, "mkdir %s", _fullpath(path, dir, sizeof(path)));
    system(command); 
 
@@ -1554,37 +1569,37 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
       goto error;
 
    // Read PVD
-   if (!readPVD(&pvd))
+   if ((err = readPVD(&pvd)) != ERR_NONE)
       goto error;
 
    // Read path table and create directories
-   if (!readPathTable(&pvd, &ptr, &numptr))
+   if ((err = readPathTable(&pvd, &ptr, &numptr)) != ERR_NONE)
       goto error;
 
 	// Read file table and figure out what goes where
-	if (!loadCompleteRecordSet(&pvd, &dirrec, &dirrecsize))
+	if ((err = loadCompleteRecordSet(&pvd, &dirrec, &dirrecsize)) != ERR_NONE)
 		goto error;
 
-	if (!createPaths(dir, ptr, numptr, dirrec, dirrecsize))
+	if ((err = createPaths(dir, ptr, numptr, dirrec, dirrecsize)) != ERR_NONE)
       goto error;
 
    // Read files into "Files" subdirectory, remember to double check that each file is properly linked to the correct start sector, etc.
 	printf("Extracting files:\n");
-   if (!extractFiles(dirrec, dirrecsize, dir))
+   if ((err = extractFiles(dirrec, dirrecsize, dir)) != ERR_NONE)
       goto error;
 
    // Read CDDA tracks into "CDDA" subdirectory
 	printf("Extracting CD Tracks:\n");
-   if (!extractCDDA(dirrec, dirrecsize, dir))
+   if ((err = extractCDDA(dirrec, dirrecsize, dir)) != ERR_NONE)
       goto error;
 
-	// Create database here and save it to the root of the output directory
-   if (!createDB(&pvd, dirrec, dirrecsize, db))
-      goto error;
+	// Create database
+   createDB(&pvd, dirrec, dirrecsize, db);
 
 	printf("Generating script file");
+   // Save database to the root of the output directory
    sprintf(dlffilename, "%s\\%s", dir, "disc.scr");
-   if (!db->saveSCR(dlffilename, oldTime))
+   if ((err = db->saveSCR(dlffilename, oldTime)) != ERR_NONE)
       goto error;
 	printf("..done\n");
 
@@ -1595,7 +1610,7 @@ int ISOExtractClass::importDisc(const char *filename, const char *dir, DBClass *
    free(cdinfo.trackinfo);
    free(ptr);
    free(dirrec);
-   return TRUE;
+   return err;
 error:
 	closeTrackHandles();
    if (cdinfo.trackinfo)
@@ -1604,7 +1619,7 @@ error:
       free(ptr);
    if (dirrec)
       free(dirrec);
-   return FALSE;
+   return err;
 }
 
 void ISOExtractClass::setSortType(ISOExtractClass::SORTTYPE sortType)

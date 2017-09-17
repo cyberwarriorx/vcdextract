@@ -18,6 +18,12 @@
 */
 
 #include <stdio.h>
+#include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#elif
+#include <unistd.h>
+#endif
 #include "ISOExtract.h"
 
 #pragma comment(linker, "/SUBSYSTEM:CONSOLE")
@@ -30,13 +36,14 @@ void usage()
 
 int main( int argc, char** argv )
 {
-   char outPath[MAX_PATH];
-   char discPath[MAX_PATH];
+   char outPath[PATH_MAX];
+   char discPath[PATH_MAX];
    bool isDisc=false;
    bool extractFiles=false;
 	bool oldTime=false;
 	bool detailedStatus = false;
 	ISOExtractClass::SORTTYPE sortType = ISOExtractClass::SORT_BY_DIRREC;
+   enum errorcode err;
 
    if (argc < 2)
    {
@@ -44,7 +51,7 @@ int main( int argc, char** argv )
       exit(1);
    }
 
-   GetCurrentDirectory(sizeof(outPath)/sizeof(outPath[0]), outPath);
+   getcwd(outPath, sizeof(outPath)/sizeof(outPath[0]));
 
    for (int i = 1; i < argc; i++)
    {
@@ -61,10 +68,12 @@ int main( int argc, char** argv )
 			sortType = ISOExtractClass::SORT_BY_LBA;
 		else
 		{
-			DWORD ret = GetFileAttributesA(argv[i]);
-
-			isDisc = (ret != INVALID_FILE_ATTRIBUTES && (ret & FILE_ATTRIBUTE_DIRECTORY));
-			strcpy(discPath, argv[i]);
+         struct stat info;
+         if (stat(argv[i], &info) == 0)
+         {
+            isDisc = !(info.st_mode & S_IFDIR) ? true : false;
+            strcpy(discPath, argv[i]);
+         }           
 		}
    }
 
@@ -76,9 +85,9 @@ int main( int argc, char** argv )
 	iec.setSortType(sortType);
 	iec.setDetailedStatus(detailedStatus);
 
-   if (!iec.importDisc(discPath, outPath, &curdb))
+   if ((err = iec.importDisc(discPath, outPath, &curdb)) != ERR_NONE)
    {
-      printf("Couldn't load disc.\n");
+      printf("Couldn't load disc. Error code = %d\n", err);
       exit(1);
    }
 

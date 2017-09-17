@@ -19,18 +19,11 @@
 
 #pragma once
 
-#include <windows.h>
-#include <commctrl.h>
 #include "FileListClass.h"
 #include "iso.h"
 
 #include <vector>
 using namespace std;
-
-#ifndef _CONSOLE
-#include <QTreeWidget>
-#include <QListWidget>
-#endif
 
 enum SessionType
 {
@@ -45,6 +38,17 @@ enum tracktype
    TT_MODE0 = 0, TT_MODE1, TT_MODE2, TT_CDDA
 };
 
+enum errorcode
+{
+   ERR_NONE,
+   ERR_OPENREAD=-1,
+   ERR_OPENWRITE=-1,
+   ERR_READ=-2,
+   ERR_WRITE=-3,
+   ERR_ALLOC=-4,
+   ERR_CREATEDIR=-5
+};
+
 typedef struct
 {
 	unsigned int fadstart;
@@ -56,7 +60,7 @@ typedef struct
 	int filesize;
 	int fileid;
 	int interleavedsub;
-   char filename[MAX_PATH];
+   char filename[PATH_MAX];
 } trackinfo_struct;
 
 typedef struct
@@ -68,14 +72,12 @@ typedef struct
 class DBClass
 {
 private:
-   HWND hwnd;
-   HTREEITEM *htreelist;
-   char dlfdir[MAX_PATH];
+   char dlfdir[PATH_MAX];
    
    // File format
    char id[4];
    int version;
-   char ipfilename[MAX_PATH];
+   char ipfilename[PATH_MAX];
    pvd_struct pvd;
    unsigned long filelistnum;
    enum SessionType sessionType;
@@ -91,18 +93,10 @@ private:
 public:
    DBClass();
    ~DBClass(void);
-   void setHWND(HWND hwnd);
    bool save(const char *filename);
    bool load(const char *filename);
-	bool saveSCR(const char *filename, bool oldTime=false);
-#ifndef _CONSOLE
-   bool listFiles(unsigned long parent, QListWidget *list);
-   bool listDirTree(QTreeWidget *tree);
-#endif
+	enum errorcode saveSCR(const char *filename, bool oldTime=false);
    bool changeFileFlags();
-#ifndef _CONSOLE
-   bool loadDiscLayout(const char *filename, QTreeWidget *tree);
-#endif
    bool saveDiscLayout(const char *filename);
    char *getDLFDirectory();
    void setDLFDirectory( const char *dlfdir );

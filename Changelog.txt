@@ -1,0 +1,4 @@
+1.0.1 -> 1.0.2
+--------------
+-Made code portable and not just windows-centric
+-MPEG extraction fixes

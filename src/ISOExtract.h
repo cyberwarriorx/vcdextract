@@ -20,7 +20,6 @@
 #ifndef ISO_EXTRACT_H
 #define ISO_EXTRACT_H
 
-#include <windows.h>
 #include <stdint.h>
 #include "iso.h"
 #include "DBClass.h"
@@ -143,15 +142,15 @@ private:
 	int extractIP(const char *dir);
 	void isoVarRead(void *var, unsigned char **buffer, size_t varsize);
    int copyDirRecord(unsigned char *buffer, dirrec_struct *dirrec);
-	int readPVD(pvd_struct *pvd);
-	int readPathTable(pvd_struct *pvd, ptr_struct **ptr, int *numptr);
-	int readDirRecords(unsigned long lba, unsigned long dirrecsize, dirrec_struct **dirrec, unsigned long *numdirrec, unsigned long parent);
-	int loadCompleteRecordSet(pvd_struct *pvd, dirrec_struct **dirrec, unsigned long *numdirrec);
-	void setPathSaveTime(HANDLE hPath, dirrec_struct *dirrec);
-	int extractFiles(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir);
-	int createPaths(const char *dir, ptr_struct *ptr, int numptr, dirrec_struct *dirrec, unsigned long numdirrec);
-	int extractCDDA(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir);
-	int createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned long numdirrec, DBClass *db);
+	enum errorcode readPVD(pvd_struct *pvd);
+	enum errorcode readPathTable(pvd_struct *pvd, ptr_struct **ptr, int *numptr);
+	enum errorcode readDirRecords(unsigned long lba, unsigned long dirrecsize, dirrec_struct **dirrec, unsigned long *numdirrec, unsigned long parent);
+	enum errorcode loadCompleteRecordSet(pvd_struct *pvd, dirrec_struct **dirrec, unsigned long *numdirrec);
+	void setPathSaveTime(char *path, dirrec_struct *dirrec);
+	enum errorcode extractFiles(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir);
+	enum errorcode createPaths(const char *dir, ptr_struct *ptr, int numptr, dirrec_struct *dirrec, unsigned long numdirrec);
+	enum errorcode extractCDDA(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir);
+	void createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned long numdirrec, DBClass *db);
 	int parseCueFile(const char *filename, FILE *fp);
 	enum tracktype getTrackType(uint64_t offset, FILE *fp);
 	int loadMDSTracks(const char *mds_filename, FILE *iso_file, mds_session_struct *mds_session);
@@ -166,7 +165,7 @@ public:
    ~ISOExtractClass();
 	void setMaintainOldTime(bool oldTime);
 	void setDetailedStatus(bool detailedStatus);
-   int importDisc(const char *filename, const char *dir, DBClass *db);
+   enum errorcode importDisc(const char *filename, const char *dir, DBClass *db);
 	int readRawSector(unsigned int FAD, unsigned char *buffer, int *readsize, trackinfo_struct *track=NULL);
 	trackinfo_struct *FADToTrack(unsigned int FAD);
 	int readUserSector(int offset, unsigned char *buffer, int *readsize, trackinfo_struct *track=NULL, sectorinfo_struct *sectorinfo=NULL);

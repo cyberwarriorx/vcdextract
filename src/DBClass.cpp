@@ -18,26 +18,22 @@
 */
 
 #include <stdio.h>
-#include <assert.h>
+#include <ctype.h>
+#ifdef _WIN32
+#include <direct.h>
+#elif
+#include <unistd.h>
+#endif
 #include "DBClass.h"
 #include "ISOExtract.h"
 
 DBClass::DBClass()
 {
-   hwnd = NULL;
-   htreelist=NULL;
    sessionType = ST_CDROM;
 }
 
 DBClass::~DBClass(void)
 {
-   if (htreelist)
-      free(htreelist);
-}
-
-void DBClass::setHWND(HWND hwnd)
-{
-   this->hwnd = hwnd;
 }
 
 bool DBClass::save(const char *filename)
@@ -45,7 +41,7 @@ bool DBClass::save(const char *filename)
    FILE *fp;
 
    if ((fp = fopen(filename, "wb")) == NULL)
-      return FALSE;
+      return false;
 
    id[0] = 'I';
    id[1] = 'T';
@@ -63,7 +59,7 @@ bool DBClass::save(const char *filename)
       filelist[i].write(fp);
    fclose(fp);
 
-   return TRUE;
+   return true;
 }
 
 bool DBClass::load(const char *filename)
@@ -71,7 +67,7 @@ bool DBClass::load(const char *filename)
    FILE *fp;
 
    if ((fp = fopen(filename, "rb")) == NULL)
-      return FALSE;
+      return false;
 
    fread((void *)id, sizeof(id), 1, fp);
    fread((void *)&version, sizeof(version), 1, fp);
@@ -83,8 +79,8 @@ bool DBClass::load(const char *filename)
       filelist[i].read(fp);
 
    fclose(fp);
-   GetCurrentDirectory(sizeof(dlfdir), dlfdir);
-   return TRUE;
+   getcwd(dlfdir, sizeof(dlfdir));
+   return true;
 }
 
 char *DBClass::stripEndWhiteSpace(unsigned char *string, int length)
@@ -192,7 +188,7 @@ void DBClass::doDirectoryMode2(FILE *fp, int dirIndex, int level)
 
 				if ((flags & (FF_MPEG|FF_VIDEO|FF_AUDIO)) == (FF_MPEG|FF_VIDEO|FF_AUDIO))
 				{
-					char basefile[MAX_PATH];
+					char basefile[PATH_MAX];
 					strcpy(basefile, filelist[i].getFilename());
 					char *p=strchr(basefile, '.');
 					if (p != NULL) 
@@ -252,15 +248,16 @@ void DBClass::writeDate(FILE *fp, char *string, unsigned char *value, size_t val
 	   fprintf(fp, "                    %-27s %02d/%02d/%04d %02d:%02d:%02d:%02d:%02d\n", string, day, month, year, hour, min, second, ms, gmt);
 }
 
-bool DBClass::saveSCR(const char *filename, bool oldTime)
+enum errorcode DBClass::saveSCR(const char *filename, bool oldTime)
 {
    FILE *fp;
+   enum errorcode err = ERR_NONE;
 
 	doMode2=false;
 	this->oldTime=oldTime;
 
    if ((fp = fopen(filename, "wt")) == NULL)
-      return FALSE;
+      return ERR_OPENWRITE;
 
    fprintf(fp, "Disc \"%s.DSK\"\n", stripEndWhiteSpace(pvd.VolumeIdentifier, sizeof(pvd.VolumeIdentifier)));
    switch (sessionType)
@@ -366,7 +363,7 @@ bool DBClass::saveSCR(const char *filename, bool oldTime)
 
    fclose(fp);
 
-   return TRUE;
+   return err;
 }
 
 bool DBClass::changeFileFlags()
@@ -431,7 +428,7 @@ void DBClass::addFile( dirrec_struct * dirrec, int i, ISOExtractClass *iec )
       }
    }
 
-   char realFilename[MAX_PATH], path[MAX_PATH], temp[MAX_PATH];
+   char realFilename[PATH_MAX], path[PATH_MAX], temp[PATH_MAX];
    strcpy(realFilename, "Files\\");
 
    // Go through parents and create path
@@ -547,7 +544,7 @@ void DBClass::addTrack( trackinfo_struct *trackinfo, int i)
 {
    tracklist.push_back(FileListClass());
    unsigned long cur=(unsigned long)tracklist.size()-1;
-   char realFilename[MAX_PATH];
+   char realFilename[PATH_MAX];
 
    sprintf(realFilename, "CDDA\\track%02d.bin", i+1);
    tracklist[cur].setRealFilename(realFilename);
