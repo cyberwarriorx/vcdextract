@@ -655,6 +655,7 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned lon
          if (mpegMultiplexDemux)
          {
             fclose(fp2);
+            setPathSaveTime(filename2, &dirrec[i]);
             fp2 = NULL;
          }
       }
