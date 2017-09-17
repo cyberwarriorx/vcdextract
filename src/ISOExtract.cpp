@@ -30,6 +30,7 @@
 # define mkdir(file) mkdir(file, 0755)
 #else
 # include <direct.h>
+# define WINDOWS_BUILD 1
 #endif
 
 extern DBClass curdb;
@@ -1107,6 +1108,10 @@ int ISOExtractClass::loadMDSTracks(const char *mdsFilename, FILE *isoFile, mds_s
 				}
 
 				fseek(isoFile, footer.filename_offset, SEEK_SET);
+
+            // Filenames should only be widechars on Windows;
+            // on other platforms, there isn't a wide fopen().
+            #ifdef WINDOWS_BUILD
 				if (footer.is_widechar)
 				{
 					wchar_t filename[512];
@@ -1133,6 +1138,7 @@ int ISOExtractClass::loadMDSTracks(const char *mdsFilename, FILE *isoFile, mds_s
 				}
 				else
 				{
+            #endif
 					char filename[512];
 					char img_filename[512];
 					memset(img_filename, 0, 512);
@@ -1154,7 +1160,9 @@ int ISOExtractClass::loadMDSTracks(const char *mdsFilename, FILE *isoFile, mds_s
 						strcpy(filename, img_filename);
 
 					fp = fopen(filename, "rb");
+            #ifdef WINDOWS_BUILD
 				}
+            #endif
 
 				if (fp == NULL)
 				{
