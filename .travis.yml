@@ -40,6 +40,13 @@ language: cpp
 
 sudo: false
 
+before_install:
+  # only build the first port if running a coverity scan. otherwise coverity will attempt to analyze all the builds
+  - if ([[ "${TRAVIS_JOB_NUMBER##*.}" != "1" ]] && [[ "${TRAVIS_BRANCH}" == "coverity_scan" ]]); then false ; fi
+  - mkdir build
+  - cd build
+  - export GIT_HASH=$(git rev-parse --short HEAD)
+
 script:
   - cmake ..
   - make
