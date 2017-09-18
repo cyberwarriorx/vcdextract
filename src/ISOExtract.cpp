@@ -29,11 +29,13 @@
 #ifndef _MSC_VER
 # include <unistd.h>
 # define mkdir(file) mkdir(file, 0755)
+# define FILE_SEPARATOR '/'
 #else
 # include <direct.h>
 # define getcwd _getcwd
 # define stat _stat
 # define realpath(file_name, resolved_name) _fullpath(resolved_name, file_name, sizeof(resolved_name))
+# define FILE_SEPARATOR '\\'
 # define WINDOWS_BUILD 1
 #endif
 
@@ -182,7 +184,7 @@ int ISOExtractClass::extractIP(const char *dir)
    FILE *outfp;
    int i;
 
-   sprintf(outfilename, "%s\\IP.BIN", dir);
+   sprintf(outfilename, "%s%cIP.BIN", dir, FILE_SEPARATOR);
    if ((outfp = fopen(outfilename, "wb")) == NULL)
       goto error;
 
@@ -562,16 +564,16 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned lon
 
             for(;;)
             {
-               sprintf(filename2, "%s\\%s", parent->FileIdentifier, filename3);
+               sprintf(filename2, "%s%c%s", parent->FileIdentifier, FILE_SEPARATOR, filename3);
                if (parent->ParentRecord == 0xFFFFFFFF)
                   break;
                strcpy(filename3, filename2);
                parent = &dirrec[parent->ParentRecord];
             }
-            sprintf(filename, "%s\\Files\\%s", dir, filename2);
+            sprintf(filename, "%s%cFiles%c%s", dir, FILE_SEPARATOR, FILE_SEPARATOR, filename2);
          }
          else
-            sprintf(filename, "%s\\Files\\%s", dir, dirrec[i].FileIdentifier);
+            sprintf(filename, "%s%cFiles%c%s", dir, FILE_SEPARATOR, FILE_SEPARATOR, dirrec[i].FileIdentifier);
 
          // remove the version number
          p = strrchr((char *)filename, ';');
@@ -690,7 +692,7 @@ enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, in
    int i;
 
    // Create Files and CDDA
-   sprintf(path, "%s\\Files", dir);
+   sprintf(path, "%s%cFiles", dir, FILE_SEPARATOR);
    
    if (mkdir(path) != 0 && errno != EEXIST)
    {
@@ -706,7 +708,7 @@ enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, in
 	}
 #endif
 
-   sprintf(path, "%s\\CDDA", dir);
+   sprintf(path, "%s%cCDDA", dir, FILE_SEPARATOR);
 
    if (mkdir(path) != 0 && errno != EEXIST)
    {
@@ -718,7 +720,7 @@ enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, in
    for (i = 1; i < numptr; i++)
    {
       if (ptr[i].ParentDirectoryNumber == 1)
-         sprintf(path, "%s\\Files\\%s", dir, ptr[i].DirectoryIdentifier);
+         sprintf(path, "%s%cFiles%c%s", dir, FILE_SEPARATOR, FILE_SEPARATOR, ptr[i].DirectoryIdentifier);
       else
       {
          ptr_struct *parent=&ptr[ptr[i].ParentDirectoryNumber-1];
@@ -726,13 +728,13 @@ enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, in
 
          for(;;)
          {
-            sprintf(path2, "%s\\%s", parent->DirectoryIdentifier, path3);
+            sprintf(path2, "%s%c%s", parent->DirectoryIdentifier, FILE_SEPARATOR, path3);
             if (parent->ParentDirectoryNumber == 1)
                break;
             strcpy(path3, path2);
             parent = &ptr[parent->ParentDirectoryNumber-1];
          }
-         sprintf(path, "%s\\Files\\%s", dir, path2);
+         sprintf(path, "%s%cFiles%c%s", dir, FILE_SEPARATOR, FILE_SEPARATOR, path2);
       }
       
       if (mkdir(path) != 0 && errno != EEXIST)
@@ -754,7 +756,7 @@ enum errorcode ISOExtractClass::extractCDDA(dirrec_struct *dirrec, unsigned long
          char filename[PATH_MAX];
          unsigned char sector[2352];
 
-         sprintf(filename, "%s\\CDDA\\track%02d.bin", dir, i+1);
+         sprintf(filename, "%s%cCDDA%ctrack%02d.bin", dir, FILE_SEPARATOR, FILE_SEPARATOR, i+1);
          FILE *outfp = fopen(filename, "wb");
 
          if (outfp)
@@ -793,7 +795,9 @@ void ISOExtractClass::createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned 
 
    // Setup basic stuff
 
-   db->setIPFilename(".\\IP.BIN");
+   char ipfilename[9];
+   sprintf(ipfilename, ".%cIP.BIN", FILE_SEPARATOR);
+   db->setIPFilename(ipfilename);
 
 //   memcpy(db->cdinfo, cdinfo, sizeof(cdinfo_struct));
    db->setPVD(pvd);
@@ -1613,7 +1617,7 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
 
 	printf("Generating script file");
    // Save database to the root of the output directory
-   sprintf(dlffilename, "%s\\%s", dir, "disc.scr");
+   sprintf(dlffilename, "%s%c%s", dir, FILE_SEPARATOR, "disc.scr");
    if ((err = db->saveSCR(dlffilename, oldTime)) != ERR_NONE)
       goto error;
 	printf("..done\n");
