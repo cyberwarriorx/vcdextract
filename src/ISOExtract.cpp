@@ -95,7 +95,7 @@ int ISOExtractClass::readSectorSubheader(unsigned int FAD, xa_subheader_struct *
 
 trackinfo_struct *ISOExtractClass::FADToTrack(unsigned int FAD)
 {
-	trackinfo_struct *track;
+	trackinfo_struct *track = NULL;
 
 	for (int i = 0; i < cdinfo.numtracks; i++)
 	{
@@ -118,6 +118,9 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 
 	if (track == NULL)
 		track = FADToTrack(FAD);
+
+   if (track == NULL)
+      return false;
 
 	if (sectorinfo)
 		sectorinfo->type = track->type;
