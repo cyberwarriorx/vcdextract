@@ -17,17 +17,29 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-#include <shlobj.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <io.h>
+#include <string.h>
 #include <sys/stat.h>
-#include <sys/utime.h>
+#include <utime.h>
 #include <time.h>
-#include <direct.h>
 #include <errno.h>
 #include "ISOExtract.h"
 #include "iso.h"
+
+#ifndef _MSC_VER
+# include <unistd.h>
+# define mkdir(file) mkdir(file, 0755)
+# define FILE_SEPARATOR '/'
+#else
+# include <direct.h>
+# define getcwd _getcwd
+# define stat _stat
+# define realpath(file_name, resolved_name) _fullpath(resolved_name, file_name, sizeof(resolved_name))
+# define FILE_SEPARATOR '\\'
+# define WINDOWS_BUILD 1
+#endif
 
 extern DBClass curdb;
 
@@ -58,11 +70,11 @@ int ISOExtractClass::readRawSector(unsigned int FAD, unsigned char *buffer, int 
 	{
 		fseek(track->fp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
 		if ((readsize[0] = (int)fread(buffer, sizeof(unsigned char), 2352, track->fp)) != 2352)
-			return FALSE;
-		return TRUE;
+			return false;
+		return true;
 	}
 
-	return FALSE;
+	return false;
 }
 
 int ISOExtractClass::readSectorSubheader(unsigned int FAD, xa_subheader_struct *subheader, trackinfo_struct *track)
@@ -74,16 +86,16 @@ int ISOExtractClass::readSectorSubheader(unsigned int FAD, xa_subheader_struct *
 	{
 		fseek(track->fp, (track->fileoffset + (FAD-track->fadstart) * track->sectorsize) + 16, SEEK_SET); 
 		if ((fread(subheader, sizeof(unsigned char), sizeof(xa_subheader_struct), track->fp)) != sizeof(xa_subheader_struct))
-			return FALSE;
-		return TRUE;
+			return false;
+		return true;
 	}   
 
-	return FALSE;
+	return false;
 }
 
 trackinfo_struct *ISOExtractClass::FADToTrack(unsigned int FAD)
 {
-	trackinfo_struct *track;
+	trackinfo_struct *track = NULL;
 
 	for (int i = 0; i < cdinfo.numtracks; i++)
 	{
@@ -107,6 +119,9 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 	if (track == NULL)
 		track = FADToTrack(FAD);
 
+   if (track == NULL)
+      return false;
+
 	if (sectorinfo)
 		sectorinfo->type = track->type;
 
@@ -117,7 +132,7 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 
 		fseek(track->fp, track->fileoffset + (FAD-track->fadstart) * track->sectorsize, SEEK_SET); 
       if (fread((void *)sync, sizeof(unsigned char), 12, track->fp) != 12)
-         return FALSE;
+         return false;
 
       if (memcmp(sync, truesync, 12) == 0)
       {
@@ -132,7 +147,7 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
 				// Figure it out based on subheader
 
 				if ((fread(&sectorinfo->subheader, sizeof(unsigned char), sizeof(xa_subheader_struct), track->fp)) != sizeof(xa_subheader_struct))
-					return FALSE;
+					return false;
 
             if (sectorinfo->subheader.sm & XAFLAG_FORM2)
 				{
@@ -147,7 +162,7 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
             fseek(track->fp, 4, SEEK_CUR);
          }
          else
-            return FALSE;
+            return false;
       }
       else
       {
@@ -163,8 +178,8 @@ int ISOExtractClass::readUserSector(int offset, unsigned char *buffer, int *read
    }
 
    if ((readsize[0] = (int)fread(buffer, sizeof(unsigned char), size, track->fp)) != size)
-      return FALSE;
-   return TRUE;
+      return false;
+   return true;
 }
 
 int ISOExtractClass::extractIP(const char *dir)
@@ -174,7 +189,7 @@ int ISOExtractClass::extractIP(const char *dir)
    FILE *outfp;
    int i;
 
-   sprintf(outfilename, "%s\\IP.BIN", dir);
+   sprintf(outfilename, "%s%cIP.BIN", dir, FILE_SEPARATOR);
    if ((outfp = fopen(outfilename, "wb")) == NULL)
       goto error;
 
@@ -189,11 +204,11 @@ int ISOExtractClass::extractIP(const char *dir)
    }
 
    fclose(outfp);
-   return TRUE;
+   return true;
 error:
    if (outfp)
       fclose(outfp);
-   return FALSE;
+   return false;
 }
 
 void ISOExtractClass::isoVarRead(void *var, unsigned char **buffer, size_t varsize)
@@ -512,7 +527,7 @@ void ISOExtractClass::setPathSaveTime(char *path, dirrec_struct *dirrec)
 
 enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir)
 {
-   DWORD i;
+   unsigned long i;
    FILE *fp, *fp2;
    char filename[PATH_MAX+2], filename2[PATH_MAX], filename3[PATH_MAX];
    unsigned char sector[2352];
@@ -554,16 +569,16 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned lon
 
             for(;;)
             {
-               sprintf(filename2, "%s\\%s", parent->FileIdentifier, filename3);
+               sprintf(filename2, "%s%c%s", parent->FileIdentifier, FILE_SEPARATOR, filename3);
                if (parent->ParentRecord == 0xFFFFFFFF)
                   break;
                strcpy(filename3, filename2);
                parent = &dirrec[parent->ParentRecord];
             }
-            sprintf(filename, "%s\\Files\\%s", dir, filename2);
+            sprintf(filename, "%s%cFiles%c%s", dir, FILE_SEPARATOR, FILE_SEPARATOR, filename2);
          }
          else
-            sprintf(filename, "%s\\Files\\%s", dir, dirrec[i].FileIdentifier);
+            sprintf(filename, "%s%cFiles%c%s", dir, FILE_SEPARATOR, FILE_SEPARATOR, dirrec[i].FileIdentifier);
 
          // remove the version number
          p = strrchr((char *)filename, ';');
@@ -618,7 +633,7 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned lon
 						curOutput = fp2;
 				}
 
-            if ((dirrec[i].DataLengthL-i2) < (DWORD)2048)
+            if ((dirrec[i].DataLengthL-i2) < (unsigned long)2048)
             {
 					if (curOutput != NULL)
 					{
@@ -682,7 +697,7 @@ enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, in
    int i;
 
    // Create Files and CDDA
-   sprintf(path, "%s\\Files", dir);
+   sprintf(path, "%s%cFiles", dir, FILE_SEPARATOR);
    
    if (mkdir(path) != 0 && errno != EEXIST)
    {
@@ -698,7 +713,7 @@ enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, in
 	}
 #endif
 
-   sprintf(path, "%s\\CDDA", dir);
+   sprintf(path, "%s%cCDDA", dir, FILE_SEPARATOR);
 
    if (mkdir(path) != 0 && errno != EEXIST)
    {
@@ -710,7 +725,7 @@ enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, in
    for (i = 1; i < numptr; i++)
    {
       if (ptr[i].ParentDirectoryNumber == 1)
-         sprintf(path, "%s\\Files\\%s", dir, ptr[i].DirectoryIdentifier);
+         sprintf(path, "%s%cFiles%c%s", dir, FILE_SEPARATOR, FILE_SEPARATOR, ptr[i].DirectoryIdentifier);
       else
       {
          ptr_struct *parent=&ptr[ptr[i].ParentDirectoryNumber-1];
@@ -718,13 +733,13 @@ enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, in
 
          for(;;)
          {
-            sprintf(path2, "%s\\%s", parent->DirectoryIdentifier, path3);
+            sprintf(path2, "%s%c%s", parent->DirectoryIdentifier, FILE_SEPARATOR, path3);
             if (parent->ParentDirectoryNumber == 1)
                break;
             strcpy(path3, path2);
             parent = &ptr[parent->ParentDirectoryNumber-1];
          }
-         sprintf(path, "%s\\Files\\%s", dir, path2);
+         sprintf(path, "%s%cFiles%c%s", dir, FILE_SEPARATOR, FILE_SEPARATOR, path2);
       }
       
       if (mkdir(path) != 0 && errno != EEXIST)
@@ -746,7 +761,7 @@ enum errorcode ISOExtractClass::extractCDDA(dirrec_struct *dirrec, unsigned long
          char filename[PATH_MAX];
          unsigned char sector[2352];
 
-         sprintf(filename, "%s\\CDDA\\track%02d.bin", dir, i+1);
+         sprintf(filename, "%s%cCDDA%ctrack%02d.bin", dir, FILE_SEPARATOR, FILE_SEPARATOR, i+1);
          FILE *outfp = fopen(filename, "wb");
 
          if (outfp)
@@ -785,7 +800,9 @@ void ISOExtractClass::createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned 
 
    // Setup basic stuff
 
-   db->setIPFilename(".\\IP.BIN");
+   char ipfilename[9];
+   sprintf(ipfilename, ".%cIP.BIN", FILE_SEPARATOR);
+   db->setIPFilename(ipfilename);
 
 //   memcpy(db->cdinfo, cdinfo, sizeof(cdinfo_struct));
    db->setPVD(pvd);
@@ -881,7 +898,7 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 			char type[512];
 			sscanf(text, "FILE \"%[^\"]\" %s\r\n", fn, type);   
 
-			if (stricmp(type, "BINARY") != 0)
+			if (strcasecmp(type, "BINARY") != 0)
 			{
 				printf("Error: Unsupported cue 'FILE' type '%s'\n", type);
 				goto error;
@@ -998,8 +1015,8 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 		}
 	}
 
-	struct _stat st;
-	_stat(cdinfo.trackinfo[0].filename, &st);
+	struct stat st;
+	stat(cdinfo.trackinfo[0].filename, &st);
 
 	for (int i = 0; i < tracknum; i++)
 	{
@@ -1010,7 +1027,7 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 	cdinfo.trackinfo[tracknum-1].fadend = cdinfo.trackinfo[tracknum-1].fadstart+
 		                                    (st.st_size-cdinfo.trackinfo[tracknum-1].fileoffset)/cdinfo.trackinfo[tracknum-1].sectorsize;
 	fclose(fp);
-   return TRUE;
+   return true;
 
 error:
    if (cdinfo.trackinfo)
@@ -1020,7 +1037,7 @@ error:
    }
    if (fp)
       fclose(fp);
-   return FALSE;
+   return false;
 }
 
 enum tracktype ISOExtractClass::getTrackType(uint64_t offset, FILE *fp)
@@ -1104,6 +1121,10 @@ int ISOExtractClass::loadMDSTracks(const char *mdsFilename, FILE *isoFile, mds_s
 				}
 
 				fseek(isoFile, footer.filename_offset, SEEK_SET);
+
+            // Filenames should only be widechars on Windows;
+            // on other platforms, there isn't a wide fopen().
+            #ifdef WINDOWS_BUILD
 				if (footer.is_widechar)
 				{
 					wchar_t filename[512];
@@ -1130,6 +1151,7 @@ int ISOExtractClass::loadMDSTracks(const char *mdsFilename, FILE *isoFile, mds_s
 				}
 				else
 				{
+            #endif
 					char filename[512];
 					char img_filename[512];
 					memset(img_filename, 0, 512);
@@ -1151,7 +1173,9 @@ int ISOExtractClass::loadMDSTracks(const char *mdsFilename, FILE *isoFile, mds_s
 						strcpy(filename, img_filename);
 
 					fp = fopen(filename, "rb");
+            #ifdef WINDOWS_BUILD
 				}
+            #endif
 
 				if (fp == NULL)
 				{
@@ -1335,8 +1359,8 @@ int ISOExtractClass::GetIntCCD(ccd_struct *ccd, char *section, char *name)
 	int i;
 	for (i = 0; i < ccd->num_dict; i++)
 	{
-		if (stricmp(ccd->dict[i].section, section) == 0 &&
-			stricmp(ccd->dict[i].name, name) == 0)
+		if (strcasecmp(ccd->dict[i].section, section) == 0 &&
+			strcasecmp(ccd->dict[i].name, name) == 0)
 			return strtol(ccd->dict[i].value, NULL, 0);
 	}
 
@@ -1529,7 +1553,7 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
    if ((p = strrchr((char *)filename, '.')) == NULL)
       goto error;
 
-   if (_stricmp(p, ".cue") == 0)
+   if (strcasecmp(p, ".cue") == 0)
    {
 		// Read cue file and figure out where bin file is
       imageType = IT_BINCUE;
@@ -1537,21 +1561,21 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
 	  if (!parseCueFile(filename, fp))
 		  goto error;
    }
-	else if (stricmp(p, ".MDS") == 0 && strncmp(header, "MEDIA ", sizeof(header)) == 0)
+	else if (strcasecmp(p, ".MDS") == 0 && strncmp(header, "MEDIA ", sizeof(header)) == 0)
 	{
 		// It's a MDS
 		imageType = IT_MDS;
 		if (parseMDS(filename, fp) != 0)
 			goto error;
 	}
-	else if (stricmp(p, ".CCD") == 0)
+	else if (strcasecmp(p, ".CCD") == 0)
 	{
 		// It's a CCD
 		imageType = IT_CCD;
 		if (parseCCD(filename, fp) != 0)
 		goto error;
 	}
-   else if (_stricmp(p, ".iso") == 0)
+   else if (strcasecmp(p, ".iso") == 0)
    {
       // Unsupported
       goto error;
@@ -1561,7 +1585,8 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
 
    char command[PATH_MAX*2];
    char path[PATH_MAX];
-   sprintf(command, "mkdir %s", _fullpath(path, dir, sizeof(path)));
+   realpath(dir, path);
+   sprintf(command, "mkdir %s", path);
    system(command); 
 
    if (!extractIP(dir))
@@ -1597,12 +1622,12 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
 
 	printf("Generating script file");
    // Save database to the root of the output directory
-   sprintf(dlffilename, "%s\\%s", dir, "disc.scr");
+   sprintf(dlffilename, "%s%c%s", dir, FILE_SEPARATOR, "disc.scr");
    if ((err = db->saveSCR(dlffilename, oldTime)) != ERR_NONE)
       goto error;
 	printf("..done\n");
 
-   GetCurrentDirectory(sizeof(dlfdir), dlfdir);
+   getcwd(dlfdir, sizeof(dlfdir));
    db->setDLFDirectory(dlfdir);
 
 	closeTrackHandles();

@@ -18,10 +18,12 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include <ctype.h>
 #ifdef _WIN32
 #include <direct.h>
-#elif
+#else
+#include <stdlib.h>
 #include <unistd.h>
 #endif
 #include "DBClass.h"
