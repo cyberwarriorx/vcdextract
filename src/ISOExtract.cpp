@@ -1590,11 +1590,9 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
    else
       goto error;
 
-   char command[PATH_MAX*2];
    char path[PATH_MAX];
    realpath(dir, path);
-   sprintf(command, "mkdir %s", path);
-   system(command); 
+   mkdir(path); 
 
    if (!extractIP(dir))
       goto error;
