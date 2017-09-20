@@ -23,8 +23,10 @@
 #ifdef _WIN32
 #include <direct.h>
 #else
-#include <stdlib.h>
 #include <unistd.h>
+#endif
+#if !defined(_WIN32) || defined(__MINGW32__)
+#include <stdlib.h>
 #endif
 #include "DBClass.h"
 #include "ISOExtract.h"
