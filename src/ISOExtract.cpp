@@ -27,7 +27,7 @@
 #include "ISOExtract.h"
 #include "iso.h"
 
-#ifndef _MSC_VER
+#ifndef _WIN32
 #include <utime.h>
 # include <unistd.h>
 # define mkdir(file) mkdir(file, 0755)
