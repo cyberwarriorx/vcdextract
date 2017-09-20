@@ -105,7 +105,7 @@ char *DBClass::stripEndWhiteSpace(unsigned char *string, int length)
 
 void DBClass::doDirectoryMode1(FILE *fp, int dirIndex, int level)
 {
-	unsigned long i;
+	uint32_t i;
 	char space[1024];
 
 	memset(space, ' ', level * 4);
@@ -153,7 +153,7 @@ void DBClass::doDirectoryMode1(FILE *fp, int dirIndex, int level)
 
 void DBClass::doDirectoryMode2(FILE *fp, int dirIndex, int level)
 {
-	unsigned long i;
+	uint32_t i;
 	char space[1024];
 
 	memset(space, ' ', level * 4);
@@ -327,7 +327,7 @@ enum errorcode DBClass::saveSCR(const char *filename, bool oldTime)
    fprintf(fp, "        EndTrack\n");
 
    // Add CDDA tracks
-   for (unsigned long i = 0; i < tracklist.size(); i++)
+   for (uint32_t i = 0; i < tracklist.size(); i++)
    {
       if (tracklist[i].getFlags() != TT_CDDA)
          continue;
@@ -406,7 +406,7 @@ void DBClass::setPVD( pvd_struct * pvd )
 void DBClass::addFile( dirrec_struct * dirrec, int i, ISOExtractClass *iec )
 {
    filelist.push_back(FileListClass());
-   unsigned long cur=(unsigned long)filelist.size()-1;
+   uint32_t cur=(uint32_t)filelist.size()-1;
    
    filelist[cur].setFilename((const char *)dirrec[i].FileIdentifier);
    filelist[cur].setLBA(dirrec[i].LocationOfExtentL);
@@ -419,8 +419,8 @@ void DBClass::addFile( dirrec_struct * dirrec, int i, ISOExtractClass *iec )
       filelist[cur].setParent(-1);
    else
    {
-      //for (unsigned long k = 0; k <= dirrec[i].ParentRecord; k++)
-		for (unsigned long k = 0; k < filelist.size(); k++)
+      //for (uint32_t k = 0; k <= dirrec[i].ParentRecord; k++)
+		for (uint32_t k = 0; k < filelist.size(); k++)
       {
          if (strcmp(filelist[k].getFilename(), (char *)dirrec[dirrec[i].ParentRecord].FileIdentifier) == 0 &&
             filelist[k].getLBA() == dirrec[dirrec[i].ParentRecord].LocationOfExtentL &&
@@ -435,7 +435,7 @@ void DBClass::addFile( dirrec_struct * dirrec, int i, ISOExtractClass *iec )
 
    // Go through parents and create path
    strcpy(path, "");
-   unsigned long parent=cur;
+   uint32_t parent=cur;
    for (int j = 0; j < 8; j++)
    {
       parent=filelist[parent].getParent();
@@ -532,7 +532,7 @@ void DBClass::addFile( dirrec_struct * dirrec, int i, ISOExtractClass *iec )
    }
 }
 
-void DBClass::setFileNumber( unsigned long num )
+void DBClass::setFileNumber( uint32_t num )
 {
    filelistnum = num;
 }
@@ -545,13 +545,13 @@ void DBClass::clearFiles()
 void DBClass::addTrack( trackinfo_struct *trackinfo, int i)
 {
    tracklist.push_back(FileListClass());
-   unsigned long cur=(unsigned long)tracklist.size()-1;
+   uint32_t cur=(uint32_t)tracklist.size()-1;
    char realFilename[PATH_MAX];
 
    sprintf(realFilename, "CDDA\\track%02d.bin", i+1);
    tracklist[cur].setRealFilename(realFilename);
    tracklist[cur].setFilename("");
-   for (unsigned long j = 0; j < filelist.size(); j++)
+   for (uint32_t j = 0; j < filelist.size(); j++)
    {
       if (filelist[j].getLBA()+150 == trackinfo->fadstart)
 		{

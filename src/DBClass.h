@@ -79,7 +79,7 @@ private:
    int version;
    char ipfilename[PATH_MAX];
    pvd_struct pvd;
-   unsigned long filelistnum;
+   uint32_t filelistnum;
    enum SessionType sessionType;
    vector <FileListClass> filelist;
    vector <FileListClass> tracklist;
@@ -104,7 +104,7 @@ public:
    void setIPFilename( const char *filename );
    void setPVD( pvd_struct * pvd );
 	void addFile( dirrec_struct * dirrec, int i, class ISOExtractClass *iec );
-   void setFileNumber( unsigned long num );
+   void setFileNumber( uint32_t num );
    void clearFiles();
    void addTrack( trackinfo_struct *trackinfo, int i);
    void clearTracks();
