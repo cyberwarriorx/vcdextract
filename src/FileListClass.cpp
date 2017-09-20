@@ -68,22 +68,22 @@ char *FileListClass::getRealFilename()
    return real_filename;
 }
 
-void FileListClass::setLBA( unsigned long lba)
+void FileListClass::setLBA( uint32_t lba)
 {
    this->lba = lba;
 }
 
-unsigned long FileListClass::getLBA()
+uint32_t FileListClass::getLBA()
 {
    return lba;
 }
 
-void FileListClass::setSize( unsigned long size)
+void FileListClass::setSize( uint32_t size)
 {
    this->size = size;
 }
 
-unsigned long FileListClass::getSize()
+uint32_t FileListClass::getSize()
 {
    return size;
 }
@@ -108,12 +108,12 @@ volumedatetime_struct &FileListClass::getDateTime()
 	return this->dateTime;
 }
 
-void FileListClass::setParent( unsigned long parent )
+void FileListClass::setParent( uint32_t parent )
 {
    this->parent = parent;
 }
 
-unsigned long FileListClass::getParent()
+uint32_t FileListClass::getParent()
 {
    return parent;
 }

@@ -50,11 +50,11 @@ public:
 private:
    char filename[32];
    char real_filename[PATH_MAX];
-   unsigned long lba;
-   unsigned long size;
+   uint32_t lba;
+   uint32_t size;
    int flags;
 	unsigned char codingInformation;
-   unsigned long parent;
+   uint32_t parent;
 	FileListClass::SOURCETYPE sourceType;
 	volumedatetime_struct dateTime;
 public:
@@ -67,16 +67,16 @@ public:
    char *getFilename();
    void setRealFilename( const char *filename );
    char *getRealFilename();
-   void setLBA( unsigned long lba);
-   unsigned long getLBA();
-   void setSize( unsigned long size);
-   unsigned long getSize();
+   void setLBA( uint32_t lba);
+   uint32_t getLBA();
+   void setSize( uint32_t size);
+   uint32_t getSize();
    void setFlags( int flags );
    int getFlags();
 	void setDateTime( volumedatetime_struct &dateTime);
 	volumedatetime_struct &getDateTime();
-   void setParent( unsigned long parent );
-   unsigned long getParent();
+   void setParent( uint32_t parent );
+   uint32_t getParent();
 	void setSourceType(FileListClass::SOURCETYPE sourceType);
 	FileListClass::SOURCETYPE getSourceType();
 	char *getSourceTypeString();

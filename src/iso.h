@@ -20,6 +20,8 @@
 #ifndef ISO_H
 #define ISO_H
 
+#include <stdint.h>
+
 typedef struct
 {
     unsigned char Year;     // Number of years since 1900
@@ -88,12 +90,12 @@ typedef struct dirrec_struct
                                             // few systems use it, we will not discuss
                                             // it here. Refer to ISO 9660:1988 for
                                             // more information.
-    unsigned long LocationOfExtentL;        // This is the Logical Block Number of the
+    uint32_t      LocationOfExtentL;        // This is the Logical Block Number of the
                                             // first Logical Block allocated to the file
-    unsigned long LocationOfExtentM;        // This is the Logical Block Number of the
+    uint32_t      LocationOfExtentM;        // This is the Logical Block Number of the
                                             // first Logical Block allocated to the file
-    unsigned long DataLengthL;              // Length of the file section in bytes
-    unsigned long DataLengthM;              // Length of the file section in bytes
+    uint32_t      DataLengthL;              // Length of the file section in bytes
+    uint32_t      DataLengthM;              // Length of the file section in bytes
     volumedatetime_struct RecordingDateAndTime;    //
     unsigned char FileFlags;                // One Byte, each bit of which is a Flag:
                                             // bit
@@ -124,7 +126,7 @@ typedef struct dirrec_struct
                                       // since I'm dealing with saturn games
                                       // only, it'll be 8.3 format
     xadirrec_struct XAAttributes;
-    unsigned long ParentRecord;  // If 0, we're root
+    uint32_t      ParentRecord;  // If 0, we're root
 } dirrec_struct;
 
 typedef struct
@@ -133,7 +135,7 @@ typedef struct
     unsigned char ExtendedAttributeRecordLength;// If an Extended Attribute Record is
                                                 // recorded, this is the length in Bytes.
                                                 // Otherwise, this is (00)
-    unsigned long  LocationOfExtent;            // Logical Block Number of the first Logical
+    uint32_t       LocationOfExtent;            // Logical Block Number of the first Logical
                                                 // Block allocated to the Directory
     unsigned short ParentDirectoryNumber;       // The record number in the Path Table for
                                                 // the parent directory of this directory
@@ -150,8 +152,8 @@ typedef struct
     unsigned char SystemIdentifier[32];
     unsigned char VolumeIdentifier[32];
     unsigned char Unused2[8];
-    unsigned long VolumeSpaceSizeL;             // Number of logical blocks in the Volume
-    unsigned long VolumeSpaceSizeM;             // Number of logical blocks in the Volume
+    uint32_t      VolumeSpaceSizeL;             // Number of logical blocks in the Volume
+    uint32_t      VolumeSpaceSizeM;             // Number of logical blocks in the Volume
     unsigned char Unused3[32];
     unsigned short VolumeSetSizeL;              // The assigned Volume Set size of the Volume
     unsigned short VolumeSetSizeM;              // The assigned Volume Set size of the Volume
@@ -161,17 +163,17 @@ typedef struct
                                                 // the Volume Set
     unsigned short LogicalBlockSizeL;           // The size in bytes of a Logical Block
     unsigned short LogicalBlockSizeM;           // The size in bytes of a Logical Block
-    unsigned long PathTableSizeL;               // Length in bytes of the path table
-    unsigned long PathTableSizeM;               // Length in bytes of the path table
-    unsigned long LocationOfTypeLPathTable;     // Logical Block Number of first Block allocated
+    uint32_t      PathTableSizeL;               // Length in bytes of the path table
+    uint32_t      PathTableSizeM;               // Length in bytes of the path table
+    uint32_t      LocationOfTypeLPathTable;     // Logical Block Number of first Block allocated
                                                 // to the Type L Path Table
-    unsigned long LocationOfOptionalTypeLPathTable; // 0 if Optional Path Table was not recorded,
+    uint32_t  LocationOfOptionalTypeLPathTable; // 0 if Optional Path Table was not recorded,
                                                 // otherwise, Logical Block Number of first
                                                 // Block allocated to the Optional Type L
                                                 // Path Table
-    unsigned long LocationOfTypeMPathTable;     // Logical Block Number of first Block
+    uint32_t      LocationOfTypeMPathTable;     // Logical Block Number of first Block
                                                 // allocated to the Type M
-    unsigned long LocationOfOptionalTypeMPathTable; // 0 if Optional Path Table was not
+    uint32_t  LocationOfOptionalTypeMPathTable; // 0 if Optional Path Table was not
                                                 // recorded, otherwise, Logical Path Table,
                                                 // Block Number of first Block allocated to the
                                                 // Type M Path Table.

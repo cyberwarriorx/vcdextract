@@ -409,16 +409,16 @@ error:
    return err;
 }
 
-enum errorcode ISOExtractClass::readDirRecords(unsigned long lba, unsigned long dirrecsize, dirrec_struct **dirrec, unsigned long *numdirrec, unsigned long parent)
+enum errorcode ISOExtractClass::readDirRecords(uint32_t lba, uint32_t dirrecsize, dirrec_struct **dirrec, uint32_t *numdirrec, uint32_t parent)
 {
    unsigned char *buffer;
-   unsigned long counter=0;
-   unsigned long num_entries;
+   uint32_t counter=0;
+   uint32_t num_entries;
    int readsize;
    unsigned char sector[2048];
    dirrec_struct *tempdirrec;
-   unsigned long maxdirrec;
-   unsigned long i;
+   uint32_t maxdirrec;
+   uint32_t i;
    enum errorcode err=ERR_NONE;
 
    if (parent == 0xFFFFFFFF)
@@ -482,9 +482,9 @@ error:
    return err;
 }
 
-enum errorcode ISOExtractClass::loadCompleteRecordSet(pvd_struct *pvd, dirrec_struct **dirrec, unsigned long *numdirrec)
+enum errorcode ISOExtractClass::loadCompleteRecordSet(pvd_struct *pvd, dirrec_struct **dirrec, uint32_t *numdirrec)
 {
-   unsigned long i;
+   uint32_t i;
    enum errorcode err=ERR_NONE;
 
    // Load in the root directory 
@@ -532,13 +532,13 @@ void ISOExtractClass::setPathSaveTime(char *path, dirrec_struct *dirrec)
    utime(path, &tb);
 }
 
-enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir)
+enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t numdirrec, const char *dir)
 {
-   unsigned long i;
+   uint32_t i;
    FILE *fp, *fp2;
    char filename[PATH_MAX+2], filename2[PATH_MAX], filename3[PATH_MAX];
    unsigned char sector[2352];
-   unsigned long bytes_written=0;
+   uint32_t bytes_written=0;
 	sectorinfo_struct sectorinfo, sectorinfo2;
    enum errorcode err = ERR_NONE;
 
@@ -618,7 +618,7 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned lon
 		if (!detailedStatus)
 				printf("%s...", dirrec[i].FileIdentifier);
 
-         for (unsigned long i2 = 0; i2 < dirrec[i].DataLengthL; i2+=2048)
+         for (uint32_t i2 = 0; i2 < dirrec[i].DataLengthL; i2+=2048)
          {
 			if (detailedStatus)
 				printf("\r%s:(%ld/%ld)", dirrec[i].FileIdentifier, i2 / 2048, dirrec[i].DataLengthL / 2048);
@@ -640,7 +640,7 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, unsigned lon
 						curOutput = fp2;
 				}
 
-            if ((dirrec[i].DataLengthL-i2) < (unsigned long)2048)
+            if ((dirrec[i].DataLengthL-i2) < (uint32_t)2048)
             {
 					if (curOutput != NULL)
 					{
@@ -696,7 +696,7 @@ error:
    return err;
 }
 
-enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, int numptr, dirrec_struct *dirrec, unsigned long numdirrec)
+enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, int numptr, dirrec_struct *dirrec, uint32_t numdirrec)
 {
    char path[PATH_MAX];
    char path2[PATH_MAX];
@@ -759,7 +759,7 @@ enum errorcode ISOExtractClass::createPaths(const char *dir, ptr_struct *ptr, in
    return ERR_NONE;
 }
 
-enum errorcode ISOExtractClass::extractCDDA(dirrec_struct *dirrec, unsigned long numdirrec, const char *dir)
+enum errorcode ISOExtractClass::extractCDDA(dirrec_struct *dirrec, uint32_t numdirrec, const char *dir)
 {
    for (int i = 0; i < cdinfo.numtracks; i++)
    {
@@ -798,12 +798,12 @@ enum errorcode ISOExtractClass::extractCDDA(dirrec_struct *dirrec, unsigned long
    return ERR_NONE;
 }
 
-void ISOExtractClass::createDB(pvd_struct *pvd, dirrec_struct *dirrec, unsigned long numdirrec, DBClass *db)
+void ISOExtractClass::createDB(pvd_struct *pvd, dirrec_struct *dirrec, uint32_t numdirrec, DBClass *db)
 {
-   unsigned long i, j, k=0;
-   unsigned long counter=0;
-   unsigned long last_lba=0, next_lba=0;
-   unsigned long next_index;
+   uint32_t i, j, k=0;
+   uint32_t counter=0;
+   uint32_t last_lba=0, next_lba=0;
+   uint32_t next_index;
 
    // Setup basic stuff
 
@@ -1542,7 +1542,7 @@ enum errorcode ISOExtractClass::importDisc(const char *filename, const char *dir
    ptr_struct *ptr=NULL;
    int numptr;
    dirrec_struct *dirrec=NULL;
-   unsigned long dirrecsize;
+   uint32_t dirrecsize;
    char dlffilename[PATH_MAX];
    char dlfdir[PATH_MAX];
 	FILE *fp;
