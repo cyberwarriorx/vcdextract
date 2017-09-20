@@ -256,6 +256,7 @@ enum errorcode DBClass::saveSCR(const char *filename, bool oldTime)
 {
    FILE *fp;
    enum errorcode err = ERR_NONE;
+   bool hasCdda = false;
 
 	doMode2=false;
 	this->oldTime=oldTime;
@@ -333,6 +334,7 @@ enum errorcode DBClass::saveSCR(const char *filename, bool oldTime)
    {
       if (tracklist[i].getFlags() != TT_CDDA)
          continue;
+      hasCdda = true;
       fprintf(fp, "        Track CDDA\n");
       
       // Find file in table here
@@ -359,7 +361,13 @@ enum errorcode DBClass::saveSCR(const char *filename, bool oldTime)
       fprintf(fp, "        EndTrack\n");
    }
 
-   fprintf(fp, "        LeadOut CDDA\n");
+   if (hasCdda) {
+      fprintf(fp, "        LeadOut CDDA\n");
+   } else if (doMode2) {
+      fprintf(fp, "        LeadOut MODE2\n");
+   } else {
+      fprintf(fp, "        LeadOut MODE1\n");
+   }
    fprintf(fp, "            Empty 600\n");
    fprintf(fp, "        EndLeadOut\n");
    fprintf(fp, "    EndSession\n");
