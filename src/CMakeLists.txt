@@ -36,8 +36,7 @@ set( vcdextract_HEADERS
 	DBClass.h
 	FileListClass.h
 	iso.h
-	ISOExtract.h 
-	mpegdemux.h)
+	ISOExtract.h)
 
 # C sources
 set( vcdextract_SOURCES
