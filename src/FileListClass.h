@@ -57,6 +57,8 @@ private:
    uint32_t parent;
 	FileListClass::SOURCETYPE sourceType;
 	volumedatetime_struct dateTime;
+   int videoBitrate;
+   int audioBitrate;
 public:
 
    FileListClass(void);
@@ -82,4 +84,8 @@ public:
 	char *getSourceTypeString();
 	void setCodingInformation(unsigned char codingInformation);
 	unsigned char getCodingInformation();
+   void setVideoBitrate(uint32_t bitrate);
+   uint32_t getVideoBitrate();
+   void setAudioBitrate(uint32_t bitrate);
+   uint32_t getAudioBitrate();
 };

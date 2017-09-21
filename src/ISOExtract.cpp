@@ -17,6 +17,9 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
+#ifdef HAVE_FFMPEG
+#include "MPEGDemux.h"
+#endif
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -535,12 +538,15 @@ void ISOExtractClass::setPathSaveTime(char *path, dirrec_struct *dirrec)
 enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t numdirrec, const char *dir)
 {
    uint32_t i;
-   FILE *fp, *fp2;
+   FILE *fp;
    char filename[PATH_MAX+2], filename2[PATH_MAX], filename3[PATH_MAX];
    unsigned char sector[2352];
    uint32_t bytes_written=0;
 	sectorinfo_struct sectorinfo, sectorinfo2;
    enum errorcode err = ERR_NONE;
+#ifdef HAVE_FFMPEG
+   MPEGDemuxClass demux;
+#endif
 
    for (i = 0; i < numdirrec; i++)
    {
@@ -563,10 +569,12 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t num
 						readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset+0, sector, &readsize, track, &sectorinfo) &&
 						readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset+1, sector, &readsize, track, &sectorinfo2))
 			{
+#ifdef HAVE_FFMPEG
 				// Is it a muxed mpeg file?
 				if ((sectorinfo.subheader.sm & XAFLAG_VIDEO) && sectorinfo.subheader.ci == 0x0F &&
 					 (sectorinfo2.subheader.sm & XAFLAG_AUDIO) && sectorinfo2.subheader.ci == 0x7F)
 					mpegMultiplexDemux = true;			
+#endif
 			}
 
          if (dirrec[i].ParentRecord != 0xFFFFFFFF)
@@ -600,69 +608,68 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t num
 				strcpy(filename2, filename);
 				strcat(filename, ".M1V");
 				strcat(filename2, ".MP2");
-
-				if ((fp2 = fopen(filename2, "wb")) == NULL)
-				{
-               err = ERR_OPENWRITE;
-					goto error;
-				}
 			}
-
-         // Treat as a regular mode 1 file
-         if ((fp = fopen(filename, "wb")) == NULL)
+         else
          {
-            err = ERR_OPENWRITE;
-            goto error;
-         }
-
-		if (!detailedStatus)
-				printf("%s...", dirrec[i].FileIdentifier);
-
-         for (uint32_t i2 = 0; i2 < dirrec[i].DataLengthL; i2+=2048)
-         {
-			if (detailedStatus)
-				printf("\r%s:(%ld/%ld)", dirrec[i].FileIdentifier, i2 / 2048, dirrec[i].DataLengthL / 2048);
-			if (!readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset + i2 / 2048, sector, &readsize, track, &sectorinfo))
-         {
-            err = ERR_READ;
-				goto error;
-         }
-
-				FILE *curOutput=NULL;
-
-				if (!mpegMultiplexDemux)
-					curOutput = fp;
-				else
-				{
-					if ((sectorinfo.subheader.sm & XAFLAG_VIDEO) && sectorinfo.subheader.ci == 0x0F)
-						curOutput = fp;
-					else if ((sectorinfo.subheader.sm & XAFLAG_AUDIO) && sectorinfo.subheader.ci == 0x7F)
-						curOutput = fp2;
-				}
-
-            if ((dirrec[i].DataLengthL-i2) < (uint32_t)2048)
+            // Treat as a regular mode 1 file
+            if ((fp = fopen(filename, "wb")) == NULL)
             {
-					if (curOutput != NULL)
-					{
-                  fwrite(sector, 1, (dirrec[i].DataLengthL-i2), curOutput);
-                  if (ferror(curOutput))
-                  {
-                     err = ERR_WRITE;
-							goto error;
-                  }
-					}
+               err = ERR_OPENWRITE;
+               goto error;
             }
-            else
+         }
+
+         if (!detailedStatus)
+            printf("%s...", dirrec[i].FileIdentifier);
+
+         if (mpegMultiplexDemux)
+         {
+#ifdef HAVE_FFMPEG
+            demux.openStream(this, dirrec[i].LocationOfExtentL, dirrec[i].DataLengthL / 2048);
+            demux.demux(filename, filename2);
+            demux.closeStream();
+#endif
+         }
+         else
+         {
+            for (uint32_t i2 = 0; i2 < dirrec[i].DataLengthL; i2+=2048)
             {
-					if (curOutput != NULL)
-					{
-                  fwrite(sector, 1, readsize, curOutput);
-                  if (ferror(curOutput))
+               if (detailedStatus)
+                  printf("\r%s:(%ld/%ld)", dirrec[i].FileIdentifier, i2 / 2048, dirrec[i].DataLengthL / 2048);
+               if (!readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset + i2 / 2048, sector, &readsize, track, &sectorinfo))
+               {
+                  err = ERR_READ;
+                  goto error;
+               }
+
+               FILE *curOutput=NULL;
+
+               curOutput = fp;
+
+               if ((dirrec[i].DataLengthL-i2) < (uint32_t)2048)
+               {
+                  if (curOutput != NULL)
                   {
-                     err = ERR_WRITE;
-							goto error;
+                     fwrite(sector, 1, (dirrec[i].DataLengthL-i2), curOutput);
+                     if (ferror(curOutput))
+                     {
+                        err = ERR_WRITE;
+                        goto error;
+                     }
                   }
-					}
+               }
+               else
+               {
+                  if (curOutput != NULL)
+                  {
+                     fwrite(sector, 1, readsize, curOutput);
+                     if (ferror(curOutput))
+                     {
+                        err = ERR_WRITE;
+                        goto error;
+                     }
+                  }
+               }
             }
          }
 
@@ -671,14 +678,16 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t num
          else
             printf("done.\n");
 
-         fclose(fp);
-         setPathSaveTime(filename, &dirrec[i]);
-         fp = NULL;
          if (mpegMultiplexDemux)
          {
-            fclose(fp2);
+            setPathSaveTime(filename, &dirrec[i]);
             setPathSaveTime(filename2, &dirrec[i]);
-            fp2 = NULL;
+         }
+         else
+         {
+            fclose(fp);
+            setPathSaveTime(filename, &dirrec[i]);
+            fp = NULL;
          }
       }
       else
@@ -691,8 +700,8 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t num
 error:
    if (fp != NULL)
       fclose(fp);
-	if (fp2 != NULL)
-      fclose(fp2);
+	//if (fp2 != NULL)
+   //   fclose(fp2);
    return err;
 }
 

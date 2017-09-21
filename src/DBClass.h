@@ -46,7 +46,10 @@ enum errorcode
    ERR_READ=-2,
    ERR_WRITE=-3,
    ERR_ALLOC=-4,
-   ERR_CREATEDIR=-5
+   ERR_CREATEDIR=-5,
+   ERR_STREAMINFO=-6,
+   ERR_COPY=-7,
+   ERR_DATANOTLOADED=-8
 };
 
 typedef struct

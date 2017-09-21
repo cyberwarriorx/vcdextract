@@ -3,6 +3,8 @@ project(vcdextract)
 include(CheckFunctionExists)
 include(CheckIncludeFile)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/CMakeTests)
+
 # disable strdup warning in MSVC
 if (MSVC)
 	add_definitions(/wd4996)
@@ -34,7 +36,8 @@ set( vcdextract_HEADERS
 	DBClass.h
 	FileListClass.h
 	iso.h
-	ISOExtract.h )
+	ISOExtract.h 
+	mpegdemux.h)
 
 # C sources
 set( vcdextract_SOURCES
@@ -42,6 +45,18 @@ set( vcdextract_SOURCES
 	FileListClass.cpp
 	ISOExtract.cpp
 	main.cpp )
+
+option(WANT_MPEG "Enable MPEG demuxing" OFF)
+if(WANT_MPEG)
+  find_package(FFmpeg)
+  if(FFMPEG_FOUND)
+    add_definitions(-DHAVE_FFMPEG=1)
+    include_directories(${FFMPEG_INCLUDE_DIRS})
+    set(VCDEXTRACT_LIBRARIES ${VCDEXTRACT_LIBRARIES} ${FFMPEG_LIBRARIES}) 
+    set(vcdextract_HEADERS ${vcdextract_HEADERS} MPEGDemux.h)
+    set(vcdextract_SOURCES ${vcdextract_SOURCES} MPEGDemux.cpp) 
+  endif()
+endif()
 
 add_executable( vcdextract WIN32
 	${vcdextract_HEADERS}

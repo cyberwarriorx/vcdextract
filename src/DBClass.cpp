@@ -17,6 +17,10 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
+#ifdef HAVE_FFMPEG
+#include "MPEGDemux.h"
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -190,25 +194,27 @@ void DBClass::doDirectoryMode2(FILE *fp, int dirIndex, int level)
 					fprintf(fp, "%s    RecordingDate %02d/%02d/%04d %02d:%02d:%02d:%02d:%02d\n", space, vdt.Day, vdt.Month, 1900+vdt.Year, vdt.Hour, vdt.Minute, vdt.Second, 0, vdt.Zone);
 				}
 
+#ifdef HAVE_FFMPEG
 				if ((flags & (FF_MPEG|FF_VIDEO|FF_AUDIO)) == (FF_MPEG|FF_VIDEO|FF_AUDIO))
 				{
 					char basefile[PATH_MAX];
 					strcpy(basefile, filelist[i].getRealFilename());
 					char *p=strchr(basefile, '.');
 					if (p != NULL) 
-						p[0]='\0';;
+						p[0]='\0';;              
 					fprintf(fp, "%s    SectorRate %d\n", space, 75);
 					fprintf(fp, "%s    Pack\n", space);
 					fprintf(fp, "%s    MpegMultiplex\n", space);
 					fprintf(fp, "%s        MpegStream \"%s.M1V\" VIDEO\n", space, basefile);
-					fprintf(fp, "%s            BitRate %d.0\n", space, 1150000);
+					fprintf(fp, "%s            BitRate %d.0\n", space, filelist[i].getVideoBitrate());
 					fprintf(fp, "%s        EndMpegStream\n", space);
 					fprintf(fp, "%s        MpegStream \"%s.MP2\" AUDIO\n", space, basefile);
-					fprintf(fp, "%s            BitRate %d.0\n", space, 192000);
+					fprintf(fp, "%s            BitRate %d.0\n", space, filelist[i].getAudioBitrate());
 					fprintf(fp, "%s        EndMpegStream\n", space);
 					fprintf(fp, "%s    EndMpegMultiplex\n", space);
 				}
 				else
+#endif
 				{
 					fprintf(fp, "%s    FileSource \"%s\"\n", space, filelist[i].getRealFilename());
 					if (filelist[i].getFlags() & FF_REALTIME)
@@ -493,6 +499,16 @@ void DBClass::addFile( dirrec_struct * dirrec, int i, ISOExtractClass *iec )
 			else if (subheader[0].sm & XAFLAG_VIDEO && subheader[0].ci == 0x0F)
 			{
 			   filelist[cur].setFlags(filelist[cur].getFlags() | FF_VIDEO | FF_MPEG);
+
+#ifdef HAVE_FFMPEG
+            MPEGDemuxClass demux;
+            demux.openStream(iec, dirrec[i].LocationOfExtentL, dirrec[i].DataLengthL / 2048);
+            filelist[cur].setVideoBitrate(demux.getVideoBitrate());
+            filelist[cur].setAudioBitrate(demux.getAudioBitrate());
+            demux.closeStream();
+#else
+            filelist[cur].setSourceType(FileListClass::ST_ISO11172);
+#endif
 				if (subheader[1].sm & XAFLAG_AUDIO && subheader[1].ci == 0x7F)
 					// MPEG Video -> ISO11172
 					filelist[cur].setFlags(filelist[cur].getFlags() | FF_AUDIO);

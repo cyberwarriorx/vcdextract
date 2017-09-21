@@ -172,3 +172,23 @@ unsigned char FileListClass::getCodingInformation()
 {
 	return codingInformation;
 }
+
+void FileListClass::setVideoBitrate(uint32_t bitrate)
+{
+   this->videoBitrate = bitrate;
+}
+
+uint32_t FileListClass::getVideoBitrate()
+{
+   return this->videoBitrate;
+}
+
+void FileListClass::setAudioBitrate(uint32_t bitrate)
+{
+   this->audioBitrate = bitrate;
+}
+
+uint32_t FileListClass::getAudioBitrate()
+{
+   return this->audioBitrate;
+}
