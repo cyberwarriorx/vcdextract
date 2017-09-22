@@ -158,6 +158,13 @@ void MPEGDemuxClass::closeStream()
 int MPEGDemuxClass::demux(char *videoFilename, char *audioFilename)
 {
    int ret = ERR_NONE;
+   AVOutputFormat *vfmt = NULL;
+   AVOutputFormat *afmt = NULL;
+   AVFormatContext *afmt_ctx = NULL;
+   int vstream_index = 0;
+   int astream_index = 0;
+   int *stream_mapping;
+   int stream_mapping_size = 0;
 
    if (ifmtCtx == NULL)
    {
@@ -174,7 +181,6 @@ int MPEGDemuxClass::demux(char *videoFilename, char *audioFilename)
       goto end;
    }
 
-   AVFormatContext *afmt_ctx = NULL;
    avformat_alloc_output_context2(&afmt_ctx, NULL, NULL, audioFilename);
    if (!afmt_ctx) 
    {
@@ -183,19 +189,17 @@ int MPEGDemuxClass::demux(char *videoFilename, char *audioFilename)
       goto end;
    }
 
-   int stream_mapping_size = ifmtCtx->nb_streams;
-   int *stream_mapping = (int *)av_mallocz_array(stream_mapping_size, sizeof(*stream_mapping));
+   stream_mapping_size = ifmtCtx->nb_streams;
+   stream_mapping = (int *)av_mallocz_array(stream_mapping_size, sizeof(*stream_mapping));
    if (!stream_mapping) 
    {
       ret = ERR_ALLOC;
       goto end;
    }
 
-   AVOutputFormat *vfmt = vfmt_ctx->oformat;
-   AVOutputFormat *afmt = afmt_ctx->oformat;
+   vfmt = vfmt_ctx->oformat;
+   afmt = afmt_ctx->oformat;
 
-   int vstream_index = 0;
-   int astream_index = 0;
    for (unsigned int i = 0; i < ifmtCtx->nb_streams; i++) 
    {
       AVStream *in_stream = ifmtCtx->streams[i];
