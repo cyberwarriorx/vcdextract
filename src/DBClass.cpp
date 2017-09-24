@@ -292,7 +292,7 @@ enum errorcode DBClass::saveSCR(const char *filename, bool oldTime)
    fprintf(fp, "        Track MODE1\n");
    fprintf(fp, "            Volume ISO9660 \"%s.PVD\"\n", stripEndWhiteSpace(pvd.VolumeIdentifier, sizeof(pvd.VolumeIdentifier)));
    fprintf(fp, "                PrimaryVolume 0:2:16\n");
-   fprintf(fp, "                    SystemIdentifier            \"SEGA SEGASATURN\"\n");
+   fprintf(fp, "                    SystemIdentifier            \"%s\"\n", stripEndWhiteSpace(pvd.SystemIdentifier, sizeof(pvd.SystemIdentifier)));
    fprintf(fp, "                    VolumeIdentifier            \"%s\"\n", stripEndWhiteSpace(pvd.VolumeIdentifier, sizeof(pvd.VolumeIdentifier)));
    fprintf(fp, "                    VolumeSetIdentifier         \"%s\"\n", stripEndWhiteSpace(pvd.VolumeSetIdentifier, sizeof(pvd.VolumeSetIdentifier)));
    fprintf(fp, "                    PublisherIdentifier         \"%s\"\n", stripEndWhiteSpace(pvd.PublisherIdentifier, sizeof(pvd.PublisherIdentifier)));
