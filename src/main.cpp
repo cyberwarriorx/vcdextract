@@ -33,7 +33,7 @@
 void usage()
 {
    printf("VCDEXTRACT v%s by Cyber Warrior X\n", VERSION);
-   printf("usage: vcdextract [--oldtime] [--detailedstatus] [--extract=<output directory>] <filename/cdrom path>");
+   printf("usage: vcdextract [--oldtime] [--detailedstatus] [--extract=<output directory>] [--sortbylba] <filename/cdrom path>");
 }
 
 int main( int argc, char** argv )
