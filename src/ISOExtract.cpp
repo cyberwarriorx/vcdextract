@@ -1029,10 +1029,16 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
             goto error;
          }
 		}
+
+		strcpy(cdinfo.trackinfo[0].filename, newFilename);
 	}
 
 	struct stat st;
-	stat(cdinfo.trackinfo[0].filename, &st);
+	if (stat(cdinfo.trackinfo[0].filename, &st) < 0)
+	{
+		printf("Error opening binary file specified in cue file: %s\n", cdinfo.trackinfo[0].filename);
+		goto error;
+	}
 
 	for (int i = 0; i < tracknum; i++)
 	{
