@@ -29,9 +29,6 @@
 #include <errno.h>
 #include "ISOExtract.h"
 #include "iso.h"
-#include <string>
-#include <sstream>
-#include <iostream>
 
 #ifndef _WIN32
 #include <utime.h>
