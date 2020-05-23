@@ -639,7 +639,7 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t num
                int offset = dirrec[i].LocationOfExtentL - cdinfo.trackinfo[trackindex].fileoffset + (i2 / 2048);
                if (!readUserSector(offset, sector, &readsize, track, &sectorinfo))
                {
-                  printf("WARNING: Could not read User sector for file:  SKIPPING\n");
+                  printf("\nWARNING: Could not read User sector for file: %s  SKIPPING\n\n", dirrec[i].FileIdentifier);
                   // err = ERR_READ;
                   // goto error;
                   break;
