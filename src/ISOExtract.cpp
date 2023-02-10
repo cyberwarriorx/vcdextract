@@ -549,7 +549,7 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t num
 #endif
 
    for (i = 0; i < numdirrec; i++)
-   {
+   {      
       bool mpegMultiplexDemux=false;
       if (!(dirrec[i].FileFlags & ISOATTR_DIRECTORY))
       {
@@ -558,7 +558,8 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t num
          int trackindex=0;
 
 			// Check first sector to make sure it isn't a CDDA track
-			trackinfo_struct *track = FADToTrack((dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset / 2048)+150);
+         unsigned int fad = (dirrec[i].LocationOfExtentL - cdinfo.trackinfo[trackindex].fileoffset) / 2048;
+			trackinfo_struct *track = FADToTrack(fad+150);
 			if (track->type == TT_CDDA)
 			{
 				dirrec[i].XAAttributes.attributes = 0x4111;
@@ -576,12 +577,11 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t num
 					mpegMultiplexDemux = true;			
 #endif
 			}
-
+         
          if (dirrec[i].ParentRecord != 0xFFFFFFFF)
          {
             dirrec_struct *parent=&dirrec[dirrec[i].ParentRecord];
             strcpy(filename3, (char *)dirrec[i].FileIdentifier);
-
             for(;;)
             {
                sprintf(filename2, "%s%c%s", parent->FileIdentifier, FILE_SEPARATOR, filename3);
@@ -636,10 +636,13 @@ enum errorcode ISOExtractClass::extractFiles(dirrec_struct *dirrec, uint32_t num
             {
                if (detailedStatus)
                   printf("\r%s:(%ld/%ld)", dirrec[i].FileIdentifier, i2 / 2048, dirrec[i].DataLengthL / 2048);
-               if (!readUserSector(dirrec[i].LocationOfExtentL-cdinfo.trackinfo[trackindex].fileoffset + i2 / 2048, sector, &readsize, track, &sectorinfo))
+               int offset = dirrec[i].LocationOfExtentL - cdinfo.trackinfo[trackindex].fileoffset + (i2 / 2048);
+               if (!readUserSector(offset, sector, &readsize, track, &sectorinfo))
                {
-                  err = ERR_READ;
-                  goto error;
+                  printf("\nWARNING: Could not read User sector for file: %s  SKIPPING\n\n", dirrec[i].FileIdentifier);
+                  // err = ERR_READ;
+                  // goto error;
+                  break;
                }
 
                FILE *curOutput=NULL;
