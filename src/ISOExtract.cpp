@@ -1,4 +1,5 @@
 /*  Copyright 2013-2016 Theo Berkau
+    Copyright 2026 Ralf Guth (multi-bin CUE support)
 
     This file is part of VCDEXTRACT.
 
@@ -1005,49 +1006,105 @@ int ISOExtractClass::parseCueFile(const char *filename, FILE *fp)
 	cdinfo.trackinfo[tracknum].fileoffset = 0;
 	cdinfo.trackinfo[tracknum].fadstart = 0xFFFFFFFF;
 
-	FILE *imageFp;
-	// Now go and open up the image file, figure out its size, etc.
-	if ((imageFp = fopen(cdinfo.trackinfo[0].filename, "rb")) == NULL)
+	// Check if this is a multi-bin CUE (each track has its own file)
 	{
-		// try stripping off path and use the same path as cue file
-		char newFilename[PATH_MAX];
-
-		MakeCuePathFilename(cdinfo.trackinfo[0].filename, filename, newFilename);
-
-		if ((imageFp = fopen(newFilename, "rb")) == NULL)
+		bool isMultiBin = false;
+		for (int i = 1; i < tracknum; i++)
 		{
-         // try using the same base filename and path as cue file
-         strcpy(newFilename, filename);
-         char *p = strrchr(newFilename, '.');
-         strcpy(p, ".BIN");
-
-         if ((imageFp = fopen(newFilename, "rb")) == NULL)
-         {
-            cdinfo.trackinfo[tracknum].fileoffset = 0xFFFFFFFF;
-            cdinfo.trackinfo[tracknum].fadstart = 0xFFFFFFFF;
-            printf("Error opening binary file specified in cue file: %s\n", cdinfo.trackinfo[0].filename);
-            goto error;
-         }
+			if (strcmp(cdinfo.trackinfo[i].filename, cdinfo.trackinfo[0].filename) != 0)
+			{
+				isMultiBin = true;
+				break;
+			}
 		}
 
-		strcpy(cdinfo.trackinfo[0].filename, newFilename);
+		if (isMultiBin)
+		{
+			// Multi-bin: open each track's file separately, recalculate FAD offsets
+			unsigned int cumulativeFAD = 150; // lead-in
+
+			for (int i = 0; i < tracknum; i++)
+			{
+				char resolvedFilename[PATH_MAX];
+				FILE *trackFp = fopen(cdinfo.trackinfo[i].filename, "rb");
+
+				if (trackFp == NULL)
+				{
+					// Try using CUE file's directory
+					MakeCuePathFilename(cdinfo.trackinfo[i].filename, filename, resolvedFilename);
+					trackFp = fopen(resolvedFilename, "rb");
+
+					if (trackFp == NULL)
+					{
+						printf("Error opening binary file: %s\n", cdinfo.trackinfo[i].filename);
+						goto error;
+					}
+					strcpy(cdinfo.trackinfo[i].filename, resolvedFilename);
+				}
+
+				struct stat st;
+				if (stat(cdinfo.trackinfo[i].filename, &st) < 0)
+				{
+					fclose(trackFp);
+					printf("Error stat'ing file: %s\n", cdinfo.trackinfo[i].filename);
+					goto error;
+				}
+
+				cdinfo.trackinfo[i].fp = trackFp;
+				cdinfo.trackinfo[i].fileoffset = 0;
+				cdinfo.trackinfo[i].fadstart = cumulativeFAD;
+				cdinfo.trackinfo[i].filesize = st.st_size;
+
+				unsigned int numSectors = st.st_size / cdinfo.trackinfo[i].sectorsize;
+				cdinfo.trackinfo[i].fadend = cumulativeFAD + numSectors - 1;
+				cumulativeFAD += numSectors;
+			}
+		}
+		else
+		{
+			// Single-bin: original behavior
+			FILE *imageFp;
+			if ((imageFp = fopen(cdinfo.trackinfo[0].filename, "rb")) == NULL)
+			{
+				char newFilename[PATH_MAX];
+				MakeCuePathFilename(cdinfo.trackinfo[0].filename, filename, newFilename);
+
+				if ((imageFp = fopen(newFilename, "rb")) == NULL)
+				{
+					strcpy(newFilename, filename);
+					char *p = strrchr(newFilename, '.');
+					strcpy(p, ".BIN");
+
+					if ((imageFp = fopen(newFilename, "rb")) == NULL)
+					{
+						cdinfo.trackinfo[tracknum].fileoffset = 0xFFFFFFFF;
+						cdinfo.trackinfo[tracknum].fadstart = 0xFFFFFFFF;
+						printf("Error opening binary file specified in cue file: %s\n", cdinfo.trackinfo[0].filename);
+						goto error;
+					}
+				}
+				strcpy(cdinfo.trackinfo[0].filename, newFilename);
+			}
+
+			struct stat st;
+			if (stat(cdinfo.trackinfo[0].filename, &st) < 0)
+			{
+				printf("Error opening binary file specified in cue file: %s\n", cdinfo.trackinfo[0].filename);
+				fclose(imageFp);
+				goto error;
+			}
+
+			for (int i = 0; i < tracknum; i++)
+			{
+				cdinfo.trackinfo[i].fp = imageFp;
+				cdinfo.trackinfo[i].fadend = cdinfo.trackinfo[i+1].fadstart-1;
+			}
+
+			cdinfo.trackinfo[tracknum-1].fadend = cdinfo.trackinfo[tracknum-1].fadstart+
+				(st.st_size-cdinfo.trackinfo[tracknum-1].fileoffset)/cdinfo.trackinfo[tracknum-1].sectorsize;
+		}
 	}
 
-	struct stat st;
-	if (stat(cdinfo.trackinfo[0].filename, &st) < 0)
-	{
-		printf("Error opening binary file specified in cue file: %s\n", cdinfo.trackinfo[0].filename);
-		goto error;
-	}
-
-	for (int i = 0; i < tracknum; i++)
-	{
-		cdinfo.trackinfo[i].fp = imageFp;
-		cdinfo.trackinfo[i].fadend = cdinfo.trackinfo[i+1].fadstart-1;
-	}
-
-	cdinfo.trackinfo[tracknum-1].fadend = cdinfo.trackinfo[tracknum-1].fadstart+
-		                                    (st.st_size-cdinfo.trackinfo[tracknum-1].fileoffset)/cdinfo.trackinfo[tracknum-1].sectorsize;
 	fclose(fp);
    return true;
 
